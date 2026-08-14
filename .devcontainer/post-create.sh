@@ -5,6 +5,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
 
 bash scripts/install-agent-clis.sh
+bash scripts/install-shared-plugin.sh
 if ! python scripts/skill_workspace.py link; then
   echo "Warning: local Skill validation or link generation failed; run 'make validate' after fixing the local source repository." >&2
 fi
@@ -19,6 +20,7 @@ Claude Code:
 Codex CLI:
   codex
 
+The shared agent-skills Plugin is installed at user scope for both CLIs.
 Run `make doctor` to inspect the environment and `make test` to validate the
 parent workspace. Each local Skill source repository owns its dependencies and tests.
 MESSAGE

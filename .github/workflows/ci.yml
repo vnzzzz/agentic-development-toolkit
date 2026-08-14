@@ -39,6 +39,32 @@ jobs:
       - name: Test parent workspace
         run: make test
 
+  plugin-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Checkout agent-skills Plugin candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: vnzzzz/agent-skills
+          ref: agent/issue-9-dual-plugin
+          path: repos/agent-skills
+      - name: Install pinned agent CLIs
+        run: bash scripts/install-agent-clis.sh
+      - name: Validate Claude Code Plugin
+        run: claude plugin validate repos/agent-skills
+      - name: Install Plugin with both CLIs
+        env:
+          AGENT_SKILLS_MARKETPLACE_SOURCE: ${{ github.workspace }}/repos/agent-skills
+        run: bash scripts/install-agent-skills-plugin.sh
+      - name: Verify installed Plugin
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          codex plugin list --json | grep -q 'agent-skills'
+          claude plugin list --json | grep -q 'agent-skills'
+
   lint:
     runs-on: ubuntu-latest
     steps:

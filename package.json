@@ -5,6 +5,6 @@
   "description": "Pinned agent CLI versions for the development container.",
   "dependencies": {
     "@anthropic-ai/claude-code": "2.1.227",
-    "@openai/codex": "0.144.6"
+    "@openai/codex": "0.147.0"
   }
 }

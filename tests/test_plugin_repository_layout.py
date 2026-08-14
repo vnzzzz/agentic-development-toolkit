@@ -88,9 +88,10 @@ class PluginRepositoryLayoutTests(unittest.TestCase):
             write_skill(external_plugins / "shared" / "skills" / "readable-code", "readable-code")
             (repository / "plugins").symlink_to(external_plugins, target_is_directory=True)
 
-            with self.patch_workspace(temp_root):
-                with self.assertRaisesRegex(ValueError, "Plugin root must not be a symlink"):
-                    skill_workspace.discover_skills()
+            with self.patch_workspace(temp_root), self.assertRaisesRegex(
+                ValueError, "Plugin root must not be a symlink"
+            ):
+                skill_workspace.discover_skills()
 
     def test_rejects_symlinked_plugin_skill_directory(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -102,11 +103,10 @@ class PluginRepositoryLayoutTests(unittest.TestCase):
             write_skill(external_skill, "readable-code")
             (collection / "readable-code").symlink_to(external_skill, target_is_directory=True)
 
-            with self.patch_workspace(temp_root):
-                with self.assertRaisesRegex(
-                    ValueError, "collection Skill directory must not be a symlink"
-                ):
-                    skill_workspace.discover_skills()
+            with self.patch_workspace(temp_root), self.assertRaisesRegex(
+                ValueError, "collection Skill directory must not be a symlink"
+            ):
+                skill_workspace.discover_skills()
 
     def test_rejects_symlinked_source_repository_root(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -122,9 +122,10 @@ class PluginRepositoryLayoutTests(unittest.TestCase):
                 external_repository, target_is_directory=True
             )
 
-            with self.patch_workspace(temp_root):
-                with self.assertRaisesRegex(ValueError, "source repository root must not be a symlink"):
-                    skill_workspace.discover_skills()
+            with self.patch_workspace(temp_root), self.assertRaisesRegex(
+                ValueError, "source repository root must not be a symlink"
+            ):
+                skill_workspace.discover_skills()
 
 
 if __name__ == "__main__":

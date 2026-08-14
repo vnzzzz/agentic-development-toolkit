@@ -1,60 +1,86 @@
 # Skill repository management
 
-`skills/` is a local placement directory for independent Skill repositories. Child directories are ignored by the parent Git repository and are not submodules.
+`repos/`は、Agent Skillのsource repositoryをローカルへ配置するdirectoryです。配下のsource repositoryは親Gitからignoreされ、submoduleとしては管理しません。
 
-## Create a local child from the template
+## 対応するsource repository
+
+### standalone repository
+
+1 repositoryが1 Skillを持つ形式です。
+
+```text
+repos/<repository>/
+└── skill/
+    └── SKILL.md
+```
+
+standalone repository名とSkillの`name`は一致させます。
+
+### collection repository
+
+1 repositoryが複数Skillを持つ形式です。
+
+```text
+repos/<repository>/
+└── skills/
+    ├── <skill-a>/
+    │   └── SKILL.md
+    └── <skill-b>/
+        └── SKILL.md
+```
+
+各`skills/<skill-name>` directory名とそのSkillの`name`は一致させます。collection repository名自体はSkill名と一致する必要はありません。
+
+repository直下の`SKILL.md`はサポートしません。`skill/`と`skills/`の両方を持つrepositoryや、Skill directoryに`SKILL.md`がない不完全layoutはconfiguration errorです。
+
+## standalone repositoryを作成する
 
 ```bash
-cp -R templates/skill-repository skills/<skill-name>
-# Edit skills/<skill-name>/skill/SKILL.md
+cp -R templates/skill-repository repos/<skill-name>
+# repos/<skill-name>/skill/SKILL.mdを編集
 make validate
 make link-skills
 ```
 
-Initialize and publish the child repository only after choosing its real remote and ownership. The parent does not create or assume a child remote.
+repositoryを個別管理する準備ができた段階で、そのdirectory内でGitを初期化・publishします。親workspaceはremote URLを仮定しません。
 
-## Clone an existing child
+## 既存repositoryをcloneする
 
-Clone the actual repository into `skills/<skill-name>`, then run:
+実在するrepository URLを`repos/<repository>`へcloneし、次を実行します。
 
 ```bash
 make validate
 make link-skills
 ```
 
-Both generated links point to the child's same `skill/` directory. The parent accepts only `skill/SKILL.md`; a repository-root `SKILL.md` or a child directory without the canonical file is reported as a configuration error.
+standalone / collectionのどちらでも、`.claude/skills/<name>`と`.agents/skills/<name>`は実際のSkill rootへ直接linkされます。同名Skillが複数source repositoryから見つかった場合は失敗します。
 
 ## Parent Git boundary
 
-Before committing the parent, verify without modifying the index:
+親をcommitする前に、indexを変更しないdry-runで確認します。
 
 ```bash
-git check-ignore -v skills/<skill-name>/skill/SKILL.md
+git check-ignore -v repos/<repository>/skill/SKILL.md
 git add -n .
 ```
 
-The dry-run must not include child files or generated agent discovery links. Child Git status, commits, remotes, tests, and releases are managed from the child repository itself.
+collection repositoryの場合も`repos/<repository>/`全体がignore対象です。dry-runにsource repositoryやgenerated discovery linkが含まれてはいけません。
 
-## Child repository responsibilities
+## Source repository responsibilities
 
-Each child owns:
+各source repositoryは次を所有します。
 
-- `skill/SKILL.md` and bundled runtime resources
-- Skill-specific scripts and dependencies
-- tests, fixtures, and demos
-- security review and dependency updates
-- manifest, versioning, releases, and distribution archives
-- GitHub Actions and Dependabot configuration
+- Skillの`SKILL.md`とbundled runtime resources
+- Skill固有scriptsとdependencies
+- tests、fixtures、demos
+- security reviewとdependency updates
+- manifest、versioning、releases、distribution archives
+- GitHub ActionsとDependabot設定
 
-The parent only discovers metadata and generates links. It does not install child dependencies or run child tests automatically.
+親workspaceはSkill metadataの探索・横断validation・discovery link生成だけを行い、source repository固有dependencyのinstallやtestを自動実行しません。
 
-## When to reconsider submodules
+## Submoduleとの関係
 
-Continue with ignored local repositories while Skills are being created independently. Consider a submodule only when all of the following are true:
+`repos/`はmutableな開発用working copyの置き場なのでsubmoduleにしません。
 
-- a child remote repository exists and has a stable release process;
-- the parent must reproduce or review a specific child commit;
-- contributors accept the additional clone and update workflow;
-- parent CI has a concrete reason to test a pinned child version.
-
-Until then, do not create `.gitmodules` or make submodule initialization a Dev Container requirement.
+review済みの特定revisionを親workspace自身の通常利用Skillとして再現可能に固定する必要がある場合は、開発用working copyとは別責務としてpin方式を検討します。mutableな開発sourceと固定consumer copyを同一path・同一責務として扱いません。

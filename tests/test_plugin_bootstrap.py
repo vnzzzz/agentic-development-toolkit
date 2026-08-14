@@ -15,8 +15,13 @@ class PluginBootstrapTests(unittest.TestCase):
         self.assertIn("vnzzzz/agent-skills", script)
         self.assertIn("codex plugin marketplace add", script)
         self.assertIn("codex plugin add", script)
+        self.assertIn("claude plugin uninstall", script)
         self.assertIn("claude plugin marketplace", script)
         self.assertIn("claude plugin install", script)
+        self.assertLess(
+            script.index("claude plugin uninstall"),
+            script.index("claude plugin marketplace remove"),
+        )
         self.assertNotIn("readable-code", script)
         self.assertNotIn("japanese-technical-writing", script)
         self.assertNotIn("skills/", script)

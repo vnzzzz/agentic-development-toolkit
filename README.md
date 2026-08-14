@@ -1,24 +1,38 @@
 # Agent Skill Development Workspace
 
-Claude CodeとCodexの両方でAgent Skillを開発するための親ワークスペースです。親リポジトリは共通環境と横断ツールだけを管理し、各Skillは独立したローカルディレクトリ、将来は個別Gitリポジトリとして管理します。
+Claude CodeとCodexの両方でAgent Skillを開発するための親workspaceです。親repositoryは共通環境と横断ツールだけを管理し、Skillの正本は`repos/`配下へcloneまたは作成したsource repository側に置きます。
+
+source repositoryは、1 Skillを持つstandalone repositoryと、複数Skillを持つcollection repositoryの両方を扱えます。
 
 ## 構成
 
 ```text
 .
 ├── .devcontainer/              # Claude Code / Codex CLI入り開発環境
-├── .github/workflows/          # 親ワークスペースだけのCI・セキュリティ
+├── .github/workflows/          # 親workspaceだけのCI・セキュリティ
 ├── scripts/                    # Skill探索・検証・リンク生成、親監査
-├── templates/skill-repository/ # 個別Skillリポジトリの雛形
-├── tests/                      # 親ワークスペースのテスト
-├── skills/
+├── templates/skill-repository/ # standalone Skill repositoryの雛形
+├── tests/                      # 親workspaceのテスト
+├── repos/
 │   ├── README.md               # 親Gitで管理する利用案内
-│   └── <skill-name>/           # 親Gitでは管理しないローカルSkillリポジトリ
+│   └── <repository>/           # 親Gitでは管理しないsource repository
 ├── .claude/skills/             # Claude Code用の生成リンク
 └── .agents/skills/             # Codex用の生成リンク
 ```
 
-`skills/*`、`.claude/skills/*`、`.agents/skills/*`は親Gitの管理対象外です。Skillの正本は各ローカルリポジトリの`skill/SKILL.md`に置き、両エージェントはその同じ`skill/`ディレクトリを参照します。リポジトリ直下の`SKILL.md`や、`skill/SKILL.md`を持たない子ディレクトリは配置ミスとして検証エラーになります。
+## 対応するrepository形式
+
+```text
+standalone repository
+repos/<repository>/skill/SKILL.md
+
+collection repository
+repos/<repository>/skills/<skill-name>/SKILL.md
+```
+
+`.claude/skills/<name>`と`.agents/skills/<name>`は、repository形式に関係なく実際のSkill rootへ直接linkします。
+
+repository直下の`SKILL.md`、`skill/`と`skills/`を同時に持つ曖昧なlayout、必要な`SKILL.md`を欠くdirectoryは検証エラーです。複数repositoryで同じSkill名が見つかった場合も失敗します。
 
 ## Dev Container
 
@@ -27,53 +41,53 @@ Claude CodeとCodexの両方でAgent Skillを開発するための親ワーク�
 1. VS Codeで **Dev Containers: Reopen in Container** を実行する。
 2. Claude Codeは`claude`、Codexは`codex`で必要な認証を行う。
 3. `make doctor`で環境を確認する。
-4. `make test`で親ワークスペースを検証する。
+4. `make test`で親workspaceを検証する。
 
-post-createはAgent CLIの導入とローカルSkillへのリンク生成だけを行います。Skill固有依存やSkill固有テストは自動実行せず、各子リポジトリの手順に従います。
+post-createはAgent CLIの導入とローカルSkillへのlink生成だけを行います。Skill固有依存やSkill固有testは自動実行せず、各source repositoryの手順に従います。
 
-Dev Containerを使わない場合は`make bootstrap`で親用のローカルPython環境と探索リンクを用意できます。Agent CLIと子Skill依存は導入しません。
+Dev Containerを使わない場合は`make bootstrap`で親用のローカルPython環境と探索linkを用意できます。Agent CLIとsource repository固有依存は導入しません。
 
-## ローカルSkillを追加する
+## source repositoryを追加する
 
-雛形から作成する場合:
+standalone repositoryを雛形から作成する場合:
 
 ```bash
-cp -R templates/skill-repository skills/<skill-name>
-# skills/<skill-name>/skill/SKILL.mdを編集
+cp -R templates/skill-repository repos/<skill-name>
+# repos/<skill-name>/skill/SKILL.mdを編集
 make validate
 make link-skills
 ```
 
-既存の個別リポジトリは、実在するURLを使って`skills/<skill-name>`へcloneします。親は子リポジトリのURLを仮定しません。詳しくは`skills/README.md`を参照してください。
+既存repositoryは、実在するURLを使って`repos/<repository>`へcloneします。collection repositoryでは`skills/<skill-name>/SKILL.md`を追加・編集します。詳しくは`repos/README.md`を参照してください。
 
-現段階ではsubmoduleを使用しません。親がreview済みの子commitを再現可能に固定する必要が生じた場合だけ、将来の選択肢として検討します。
+mutableな開発用repositoryはsubmoduleにしません。親workspace自身がreview済みshared revisionを固定利用する仕組みは別責務として扱います。
 
-## 親ワークスペースのコマンド
+## 親workspaceのコマンド
 
 ```bash
-make validate       # ローカルSkillのfrontmatterと配布境界を検証。0件でも成功
-make link-skills    # Claude Code/Codex双方の探索リンクを同期。0件なら古いリンクを削除
+make validate       # ローカルSkillのfrontmatter、配置、配布境界を検証。0件でも成功
+make link-skills    # Claude Code/Codex双方の探索linkを同期。0件なら古いlinkを削除
 make test           # 親のunit testと親セキュリティ監査だけを実行
 make audit          # 親workflow、Dev Container、親管理ファイルを監査
 make doctor         # ツールとローカルSkill一覧を表示。0件は成功、不正配置は診断して失敗
 ```
 
-Skill固有の依存導入、テスト、demo、manifest、release、配布物生成は、各`skills/<skill-name>`内で実行します。
+Skill固有の依存導入、test、demo、manifest、release、配布物生成は各source repository内で実行します。
 
 ## Git境界を確認する
 
 親をcommitする前に、indexを変更しないdry-runで確認します。
 
 ```bash
-git check-ignore -v skills/<skill-name>/skill/SKILL.md
+git check-ignore -v repos/<repository>/skill/SKILL.md
 git add -n .
 ```
 
-`git add -n .`の出力に`skills/<skill-name>/`、`.claude/skills/<skill-name>`、`.agents/skills/<skill-name>`が含まれてはいけません。
+`git add -n .`の出力に`repos/<repository>/`、`.claude/skills/<name>`、`.agents/skills/<name>`が含まれてはいけません。
 
 ## CI責務
 
-- 親CI: 親のPython・shell・設定、探索/検証/リンクロジック、0件動作、一時fixture、テンプレート、親セキュリティ設定。
-- 子CI: Skill本体、固有スクリプト、依存、tests、fixtures、demo、manifest、release、配布物。
+- 親CI: 親のPython・shell・設定、探索/検証/linkロジック、0件動作、一時fixture、standalone template、親セキュリティ設定。
+- source repository側CI: Skill本体、固有script、依存、tests、fixtures、demo、manifest、release、配布物。
 
-設計判断は`docs/adr/0001-polyrepo-workspace.md`、子リポジトリ運用は`docs/skill-repository-management.md`を参照してください。
+設計判断は`docs/adr/0001-polyrepo-workspace.md`と`docs/adr/0002-skill-collection-repositories.md`、repository運用は`docs/skill-repository-management.md`を参照してください。

@@ -84,7 +84,7 @@ def audit_devcontainer(findings: list[str]) -> None:
     if claude_mounts and codex_mounts and mount_source(claude_mounts[0]) == mount_source(codex_mounts[0]):
         findings.append(f"{relative}: Claude and Codex authentication must use different volumes")
 
-    if "COPY skills" in dockerfile or "pip install" in dockerfile:
+    if "COPY repos" in dockerfile or "pip install" in dockerfile:
         findings.append(
             ".devcontainer/Dockerfile: repository-controlled dependencies must not execute during the root image build"
         )
@@ -112,7 +112,7 @@ def audit_workflows(findings: list[str]) -> None:
 
 
 def parent_managed_paths() -> list[Path]:
-    excluded_top_level = {".agents", ".claude", ".codex", ".git", ".venv", "build", "skills"}
+    excluded_top_level = {".agents", ".claude", ".codex", ".git", ".venv", "build", "repos"}
     paths: list[Path] = []
     for path in ROOT.iterdir():
         if path.name in excluded_top_level:
@@ -121,7 +121,7 @@ def parent_managed_paths() -> list[Path]:
             paths.extend(path.rglob("*"))
         else:
             paths.append(path)
-    for path in (ROOT / "skills" / "README.md", ROOT / "skills" / ".gitkeep"):
+    for path in (ROOT / "repos" / "README.md", ROOT / "repos" / ".gitkeep"):
         if path.exists():
             paths.append(path)
     return sorted(paths)

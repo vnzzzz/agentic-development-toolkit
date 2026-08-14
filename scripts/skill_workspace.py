@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-SKILLS_DIR = ROOT / "skills"
+REPOS_DIR = ROOT / "repos"
 DISCOVERY_DIRS = (ROOT / ".claude" / "skills", ROOT / ".agents" / "skills")
 NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SECRET_FILENAMES = {
@@ -32,6 +32,7 @@ class Skill:
     repository_root: Path
     skill_root: Path
     description: str
+    layout: str
 
 
 def parse_frontmatter(path: Path) -> dict[str, str]:
@@ -59,27 +60,69 @@ def parse_frontmatter(path: Path) -> dict[str, str]:
     return result
 
 
-def discover_skills() -> list[Skill]:
-    skills: list[Skill] = []
-    if not SKILLS_DIR.exists():
+def load_skill(repository_root: Path, skill_root: Path, layout: str) -> Skill:
+    skill_file = skill_root / "SKILL.md"
+    metadata = parse_frontmatter(skill_file)
+    return Skill(
+        metadata.get("name", ""),
+        repository_root,
+        skill_root,
+        metadata.get("description", ""),
+        layout,
+    )
+
+
+def discover_repository_skills(repository_root: Path) -> list[Skill]:
+    repository_root_skill = repository_root / "SKILL.md"
+    if repository_root_skill.is_file():
+        raise ValueError(
+            f"{repository_root_skill}: repository-root SKILL.md is not supported; "
+            "use skill/SKILL.md for a standalone repository or "
+            "skills/<skill-name>/SKILL.md for a collection repository"
+        )
+
+    standalone_root = repository_root / "skill"
+    collection_root = repository_root / "skills"
+    standalone_exists = standalone_root.exists()
+    collection_exists = collection_root.exists()
+
+    if standalone_exists and collection_exists:
+        raise ValueError(
+            f"{repository_root}: ambiguous Skill repository layout; both skill/ and skills/ exist"
+        )
+
+    if standalone_exists:
+        if not standalone_root.is_dir():
+            raise ValueError(f"{standalone_root}: standalone Skill root must be a directory")
+        skill_file = standalone_root / "SKILL.md"
+        if not skill_file.is_file():
+            raise ValueError(f"{repository_root}: missing canonical Skill file skill/SKILL.md")
+        return [load_skill(repository_root, standalone_root, "standalone")]
+
+    if collection_exists:
+        if not collection_root.is_dir():
+            raise ValueError(f"{collection_root}: collection Skill root must be a directory")
+        skills: list[Skill] = []
+        for skill_root in sorted(path for path in collection_root.iterdir() if path.is_dir()):
+            skill_file = skill_root / "SKILL.md"
+            if not skill_file.is_file():
+                raise ValueError(f"{skill_root}: missing canonical collection Skill file SKILL.md")
+            skills.append(load_skill(repository_root, skill_root, "collection"))
         return skills
 
-    for repository_root in sorted(path for path in SKILLS_DIR.iterdir() if path.is_dir()):
-        skill_file = repository_root / "skill" / "SKILL.md"
-        repository_root_skill = repository_root / "SKILL.md"
-        if repository_root_skill.is_file():
-            raise ValueError(
-                f"{repository_root_skill}: repository-root SKILL.md is not supported; "
-                "move the distributable Skill to skill/SKILL.md"
-            )
-        if not skill_file.is_file():
-            raise ValueError(
-                f"{repository_root}: missing canonical Skill file skill/SKILL.md"
-            )
-        metadata = parse_frontmatter(skill_file)
-        name = metadata.get("name", "")
-        description = metadata.get("description", "")
-        skills.append(Skill(name, repository_root, skill_file.parent, description))
+    raise ValueError(
+        f"{repository_root}: missing supported Skill layout; expected skill/SKILL.md "
+        "or skills/<skill-name>/SKILL.md"
+    )
+
+
+def discover_skills() -> list[Skill]:
+    skills: list[Skill] = []
+    if not REPOS_DIR.exists():
+        return skills
+
+    for repository_root in sorted(path for path in REPOS_DIR.iterdir() if path.is_dir()):
+        skills.extend(discover_repository_skills(repository_root))
     return skills
 
 
@@ -100,10 +143,15 @@ def validate_skill(skill: Skill) -> list[str]:
         errors.append(
             f"{skill_file}: name must be <=64 chars and contain lowercase letters, digits, and interior hyphens"
         )
-    if skill.name and skill.repository_root.name != skill.name:
-        errors.append(
-            f"{skill.repository_root}: repository directory must match Skill name '{skill.name}'"
-        )
+
+    if skill.name:
+        expected_directory = skill.repository_root if skill.layout == "standalone" else skill.skill_root
+        if expected_directory.name != skill.name:
+            directory_kind = "repository" if skill.layout == "standalone" else "collection Skill"
+            errors.append(
+                f"{expected_directory}: {directory_kind} directory must match Skill name '{skill.name}'"
+            )
+
     if not skill.description:
         errors.append(f"{skill_file}: required frontmatter field 'description' is empty")
     elif len(skill.description) > 1024:
@@ -124,18 +172,29 @@ def validate_skill(skill: Skill) -> list[str]:
     return errors
 
 
+def duplicate_name_errors(skills: list[Skill]) -> list[str]:
+    errors: list[str] = []
+    seen: dict[str, Path] = {}
+    for skill in skills:
+        if not skill.name:
+            continue
+        previous = seen.get(skill.name)
+        if previous is not None:
+            errors.append(f"duplicate Skill name '{skill.name}': {previous} and {skill.skill_root}")
+        else:
+            seen[skill.name] = skill.skill_root
+    return errors
+
+
 def command_validate() -> int:
     try:
         skills = discover_skills()
     except (OSError, ValueError) as exc:
         print(f"Validation failed:\n- {exc}", file=sys.stderr)
         return 1
-    errors: list[str] = []
-    names: set[str] = set()
+
+    errors = duplicate_name_errors(skills)
     for skill in skills:
-        if skill.name in names:
-            errors.append(f"duplicate Skill name: {skill.name}")
-        names.add(skill.name)
         errors.extend(validate_skill(skill))
 
     if errors:
@@ -150,7 +209,7 @@ def command_validate() -> int:
 
     print(f"Validated {len(skills)} Skill(s):")
     for skill in skills:
-        print(f"- {skill.name}: {skill.skill_root.relative_to(ROOT)}")
+        print(f"- {skill.name}: {skill.skill_root.relative_to(ROOT)} [{skill.layout}]")
     return 0
 
 
@@ -221,6 +280,12 @@ def command_doctor() -> int:
     if not skills and status == 0:
         print("- none")
 
+    duplicate_errors = duplicate_name_errors(skills)
+    if duplicate_errors:
+        status = 1
+        for error in duplicate_errors:
+            print(f"- {error}")
+
     for skill in skills:
         git_marker = "independent-git" if (skill.repository_root / ".git").exists() else "local-directory"
         errors = validate_skill(skill)
@@ -229,12 +294,15 @@ def command_doctor() -> int:
             display_name = skill.name or "<unnamed>"
             print(
                 f"- {display_name}: {skill.skill_root.relative_to(ROOT)} "
-                f"[{git_marker}, invalid]"
+                f"[{git_marker}, {skill.layout}, invalid]"
             )
             for error in errors:
                 print(f"  - {error}")
             continue
-        print(f"- {skill.name}: {skill.skill_root.relative_to(ROOT)} [{git_marker}]")
+        print(
+            f"- {skill.name}: {skill.skill_root.relative_to(ROOT)} "
+            f"[{git_marker}, {skill.layout}]"
+        )
 
     print(f"checked_at: {datetime.now(timezone.utc).isoformat()}")
     return status

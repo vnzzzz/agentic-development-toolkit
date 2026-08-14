@@ -1,6 +1,6 @@
 # ADR 0001: Parent workspace with independent local Skill repositories
 
-- Status: Accepted
+- Status: Accepted; amended by ADR 0002
 - Date: 2026-07-20
 
 ## Context
@@ -19,6 +19,8 @@ The parent repository must remain usable immediately after clone, when no child 
 6. Limit parent automation to the Dev Container, discovery tooling, templates, parent tests, documentation, and parent security settings.
 7. Keep child dependencies, tests, fixtures, demos, manifests, releases, distribution artifacts, CI, and Dependabot in each child repository.
 8. Do not use Git submodules now. Reconsider them only if the parent later needs to pin reviewed child commits reproducibly.
+
+ADR 0002 preserves the independent-source ownership and submodule deferral in this decision, while changing the local placement directory to `repos/` and adding collection repositories alongside standalone repositories.
 
 ## Consequences
 

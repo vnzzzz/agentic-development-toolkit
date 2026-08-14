@@ -6,20 +6,16 @@ MARKETPLACE_NAME=vnzzzz-agent-skills
 PLUGIN_ID=agent-skills@vnzzzz-agent-skills
 
 install_for_codex() {
-  codex plugin marketplace add "$MARKETPLACE_SOURCE" --json >/dev/null
-  codex plugin marketplace upgrade "$MARKETPLACE_NAME" --json >/dev/null 2>&1 || true
   codex plugin remove "$PLUGIN_ID" --json >/dev/null 2>&1 || true
+  codex plugin marketplace remove "$MARKETPLACE_NAME" --json >/dev/null 2>&1 || true
+  codex plugin marketplace add "$MARKETPLACE_SOURCE" --json >/dev/null
   codex plugin add "$PLUGIN_ID" --json >/dev/null
 }
 
 install_for_claude() {
-  if ! claude plugin marketplace update "$MARKETPLACE_NAME" >/dev/null 2>&1; then
-    claude plugin marketplace add "$MARKETPLACE_SOURCE" --scope user >/dev/null
-  fi
-
-  if ! claude plugin update "$PLUGIN_ID" --scope user >/dev/null 2>&1; then
-    claude plugin install "$PLUGIN_ID" --scope user >/dev/null
-  fi
+  claude plugin marketplace remove "$MARKETPLACE_NAME" >/dev/null 2>&1 || true
+  claude plugin marketplace add "$MARKETPLACE_SOURCE" --scope user >/dev/null
+  claude plugin install "$PLUGIN_ID" --scope user >/dev/null
 }
 
 command -v codex >/dev/null || {

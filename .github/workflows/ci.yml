@@ -39,6 +39,52 @@ jobs:
       - name: Test parent workspace
         run: make test
 
+  plugin-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify public marketplace is anonymously readable
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          GIT_CONFIG_GLOBAL=/dev/null \
+            git -c credential.helper= -c http.extraHeader= \
+            ls-remote https://github.com/vnzzzz/agent-skills.git HEAD >/dev/null
+      - name: Checkout agent-skills provider
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: vnzzzz/agent-skills
+          path: repos/agent-skills
+          persist-credentials: false
+      - name: Validate provider metadata
+        run: python3 repos/agent-skills/scripts/validate-plugin.py
+      - name: Install pinned agent CLIs
+        run: bash scripts/install-agent-clis.sh
+      - name: Validate Claude Code Plugin
+        run: claude plugin validate repos/agent-skills
+      - name: Install Plugin from public default source
+        run: bash scripts/install-agent-skills-plugin.sh
+      - name: Re-run Plugin bootstrap from public default source
+        run: bash scripts/install-agent-skills-plugin.sh
+      - name: Switch Plugin marketplace source
+        shell: bash
+        run: cp -R repos/agent-skills /tmp/agent-skills-alternate
+      - name: Reinstall from alternate source
+        env:
+          AGENT_SKILLS_MARKETPLACE_SOURCE: /tmp/agent-skills-alternate
+        run: bash scripts/install-agent-skills-plugin.sh
+      - name: Restore public default source
+        run: bash scripts/install-agent-skills-plugin.sh
+      - name: Verify installed Plugin
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          codex plugin list --json | grep -q 'agent-skills'
+          claude plugin list --json | grep -q 'agent-skills'
+
   lint:
     runs-on: ubuntu-latest
     steps:

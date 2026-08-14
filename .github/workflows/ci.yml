@@ -39,6 +39,22 @@ jobs:
       - name: Test parent workspace
         run: make test
 
+  plugin-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install agent CLIs
+        run: bash scripts/install-agent-clis.sh
+      - name: Install shared Plugin from agent-skills PR branch
+        env:
+          AGENT_SKILLS_MARKETPLACE_REF: agent/issue-9-dual-plugin
+        run: bash scripts/install-shared-plugin.sh
+      - name: Verify bootstrap is idempotent
+        env:
+          AGENT_SKILLS_MARKETPLACE_REF: agent/issue-9-dual-plugin
+        run: bash scripts/install-shared-plugin.sh
+
   lint:
     runs-on: ubuntu-latest
     steps:

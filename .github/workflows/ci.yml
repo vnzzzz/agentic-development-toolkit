@@ -44,6 +44,8 @@ jobs:
     steps:
       - name: Checkout workspace
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Verify public marketplace is anonymously readable
         shell: bash
         run: |
@@ -57,6 +59,7 @@ jobs:
           repository: vnzzzz/agent-skills
           ref: agent/issue-9-dual-plugin
           path: repos/agent-skills
+          persist-credentials: false
       - name: Validate provider metadata
         run: python3 repos/agent-skills/scripts/validate-plugin.py
       - name: Install pinned agent CLIs
@@ -70,6 +73,13 @@ jobs:
       - name: Re-run Plugin bootstrap
         env:
           AGENT_SKILLS_MARKETPLACE_SOURCE: ${{ github.workspace }}/repos/agent-skills
+        run: bash scripts/install-agent-skills-plugin.sh
+      - name: Switch Plugin marketplace source
+        shell: bash
+        run: cp -R repos/agent-skills /tmp/agent-skills-alternate
+      - name: Reinstall from alternate source
+        env:
+          AGENT_SKILLS_MARKETPLACE_SOURCE: /tmp/agent-skills-alternate
         run: bash scripts/install-agent-skills-plugin.sh
       - name: Verify installed Plugin
         shell: bash

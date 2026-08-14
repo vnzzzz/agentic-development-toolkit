@@ -2,7 +2,7 @@
 
 Claude CodeとCodexの両方でAgent Skillを開発するための親workspaceです。親repositoryは共通環境と横断ツールだけを管理し、Skillの正本は`repos/`配下へcloneまたは作成したsource repository側に置きます。
 
-source repositoryは、1 Skillを持つstandalone repositoryと、複数Skillを持つcollection repositoryの両方を扱えます。
+source repositoryは、1 Skillを持つstandalone repository、複数Skillを持つcollection repository、Plugin marketplace repositoryを扱えます。
 
 ## 構成
 
@@ -28,11 +28,14 @@ repos/<repository>/skill/SKILL.md
 
 collection repository
 repos/<repository>/skills/<skill-name>/SKILL.md
+
+Plugin marketplace repository
+repos/<repository>/plugins/<plugin-name>/skills/<skill-name>/SKILL.md
 ```
 
 `.claude/skills/<name>`と`.agents/skills/<name>`は、repository形式に関係なく実際のlocal Skill rootへ直接linkします。
 
-repository直下の`SKILL.md`、`skill/`と`skills/`を同時に持つ曖昧なlayout、必要な`SKILL.md`を欠くdirectoryは検証エラーです。複数repositoryで同じSkill名が見つかった場合も失敗します。
+一つのsource repositoryで`skill/`、`skills/`、`plugins/`を混在させるlayoutは検証エラーです。Plugin repositoryではSkillを持たないPluginを許容しますが、少なくとも一つの`plugins/<plugin-name>/skills/`が必要です。複数repositoryやPluginで同じSkill名が見つかった場合も失敗します。
 
 ## shared agent-skills Plugin
 
@@ -40,7 +43,7 @@ workspace自身が通常利用する汎用Skillは、public repository `vnzzzz/a
 
 - Skill本文を親workspaceへ複製しません。
 - git submoduleや固定revisionを使いません。
-- 個別Skill名や`agent-skills/skills/<name>`を親workspaceへ列挙しません。
+- 個別Skill名やprovider repository内部pathをPlugin bootstrapへ列挙しません。
 - Dev Container作成時にmarketplaceを登録または更新し、最新Pluginを導入します。
 - public GitHub repositoryのHTTPS取得なのでGitHub認証情報は不要です。GitHubへの外向きHTTPS通信は必要です。
 
@@ -84,10 +87,10 @@ make validate
 make link-skills
 ```
 
-既存repositoryは、実在するURLを使って`repos/<repository>`へcloneします。collection repositoryでは`skills/<skill-name>/SKILL.md`を追加・編集します。詳しくは`repos/README.md`を参照してください。
+既存repositoryは、実在するURLを使って`repos/<repository>`へcloneします。collection repositoryとPlugin marketplace repositoryも自動探索されます。詳しくは`repos/README.md`を参照してください。
 
 mutableな開発用repositoryはsubmoduleにしません。
-`repos/agent-skills`でshared collection自体を開発する場合も、他のcollection repositoryと同じlocal sourceとして扱います。
+`repos/agent-skills`もPlugin marketplace repositoryとして他のlocal sourceと同じ検証・link経路で扱います。
 
 ## 親workspaceのコマンド
 

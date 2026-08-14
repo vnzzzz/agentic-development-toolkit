@@ -62,6 +62,8 @@ def parse_frontmatter(path: Path) -> dict[str, str]:
 
 def load_skill(repository_root: Path, skill_root: Path, layout: str) -> Skill:
     skill_file = skill_root / "SKILL.md"
+    if skill_file.is_symlink():
+        raise ValueError(f"{skill_file}: canonical Skill file must not be a symlink")
     metadata = parse_frontmatter(skill_file)
     return Skill(
         metadata.get("name", ""),
@@ -77,11 +79,17 @@ def load_collection_skills(
     collection_root: Path,
     layout: str,
 ) -> list[Skill]:
+    if collection_root.is_symlink():
+        raise ValueError(f"{collection_root}: collection Skill root must not be a symlink")
     if not collection_root.is_dir():
         raise ValueError(f"{collection_root}: collection Skill root must be a directory")
 
     skills: list[Skill] = []
-    for skill_root in sorted(path for path in collection_root.iterdir() if path.is_dir()):
+    for skill_root in sorted(collection_root.iterdir()):
+        if skill_root.is_symlink():
+            raise ValueError(f"{skill_root}: collection Skill directory must not be a symlink")
+        if not skill_root.is_dir():
+            continue
         skill_file = skill_root / "SKILL.md"
         if not skill_file.is_file():
             raise ValueError(f"{skill_root}: missing canonical collection Skill file SKILL.md")
@@ -90,14 +98,20 @@ def load_collection_skills(
 
 
 def discover_plugin_repository_skills(repository_root: Path, plugins_root: Path) -> list[Skill]:
+    if plugins_root.is_symlink():
+        raise ValueError(f"{plugins_root}: Plugin root must not be a symlink")
     if not plugins_root.is_dir():
         raise ValueError(f"{plugins_root}: Plugin root must be a directory")
 
     skills: list[Skill] = []
     found_skill_collection = False
-    for plugin_root in sorted(path for path in plugins_root.iterdir() if path.is_dir()):
+    for plugin_root in sorted(plugins_root.iterdir()):
+        if plugin_root.is_symlink():
+            raise ValueError(f"{plugin_root}: Plugin directory must not be a symlink")
+        if not plugin_root.is_dir():
+            continue
         collection_root = plugin_root / "skills"
-        if not collection_root.exists():
+        if not (collection_root.exists() or collection_root.is_symlink()):
             continue
         found_skill_collection = True
         skills.extend(load_collection_skills(repository_root, collection_root, "plugin-collection"))
@@ -122,9 +136,9 @@ def discover_repository_skills(repository_root: Path) -> list[Skill]:
     standalone_root = repository_root / "skill"
     collection_root = repository_root / "skills"
     plugins_root = repository_root / "plugins"
-    standalone_exists = standalone_root.exists()
-    collection_exists = collection_root.exists()
-    plugins_exists = plugins_root.exists()
+    standalone_exists = standalone_root.exists() or standalone_root.is_symlink()
+    collection_exists = collection_root.exists() or collection_root.is_symlink()
+    plugins_exists = plugins_root.exists() or plugins_root.is_symlink()
 
     detected_layouts = sum((standalone_exists, collection_exists, plugins_exists))
     if detected_layouts > 1:
@@ -133,6 +147,8 @@ def discover_repository_skills(repository_root: Path) -> list[Skill]:
         )
 
     if standalone_exists:
+        if standalone_root.is_symlink():
+            raise ValueError(f"{standalone_root}: standalone Skill root must not be a symlink")
         if not standalone_root.is_dir():
             raise ValueError(f"{standalone_root}: standalone Skill root must be a directory")
         skill_file = standalone_root / "SKILL.md"
@@ -157,7 +173,11 @@ def discover_skills() -> list[Skill]:
     if not REPOS_DIR.exists():
         return skills
 
-    for repository_root in sorted(path for path in REPOS_DIR.iterdir() if path.is_dir()):
+    for repository_root in sorted(REPOS_DIR.iterdir()):
+        if repository_root.is_symlink():
+            raise ValueError(f"{repository_root}: source repository root must not be a symlink")
+        if not repository_root.is_dir():
+            continue
         skills.extend(discover_repository_skills(repository_root))
     return skills
 

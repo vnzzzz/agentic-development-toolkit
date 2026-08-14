@@ -13,6 +13,7 @@ install_for_codex() {
 }
 
 install_for_claude() {
+  claude plugin uninstall "$PLUGIN_ID" --scope user >/dev/null 2>&1 || true
   claude plugin marketplace remove "$MARKETPLACE_NAME" >/dev/null 2>&1 || true
   claude plugin marketplace add "$MARKETPLACE_SOURCE" --scope user >/dev/null
   claude plugin install "$PLUGIN_ID" --scope user >/dev/null

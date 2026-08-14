@@ -1,19 +1,19 @@
 from __future__ import annotations
 
-from contextlib import redirect_stderr, redirect_stdout
-from io import StringIO
 import json
-from pathlib import Path
 import shutil
 import subprocess
-from tempfile import TemporaryDirectory
 import sys
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-import skill_workspace  # noqa: E402
+import skill_workspace
 
 
 def write_skill(skill_root: Path, name: str) -> None:
@@ -96,42 +96,52 @@ class WorkspaceTests(unittest.TestCase):
                 "---\nname: sample\ndescription: Noncanonical fixture.\n---\n",
                 encoding="utf-8",
             )
-            with self.patch_workspace(temp_root):
-                with self.assertRaisesRegex(ValueError, "repository-root SKILL.md is not supported"):
-                    skill_workspace.discover_skills()
+            with (
+                self.patch_workspace(temp_root),
+                self.assertRaisesRegex(ValueError, "repository-root SKILL.md is not supported"),
+            ):
+                skill_workspace.discover_skills()
 
     def test_repository_without_supported_layout_is_rejected(self) -> None:
         with TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             (temp_root / "repos" / "sample").mkdir(parents=True)
-            with self.patch_workspace(temp_root):
-                with self.assertRaisesRegex(ValueError, "missing supported Skill layout"):
-                    skill_workspace.discover_skills()
+            with (
+                self.patch_workspace(temp_root),
+                self.assertRaisesRegex(ValueError, "missing supported Skill layout"),
+            ):
+                skill_workspace.discover_skills()
 
     def test_incomplete_standalone_repository_is_rejected(self) -> None:
         with TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             (temp_root / "repos" / "sample" / "skill").mkdir(parents=True)
-            with self.patch_workspace(temp_root):
-                with self.assertRaisesRegex(ValueError, "missing canonical Skill file skill/SKILL.md"):
-                    skill_workspace.discover_skills()
+            with (
+                self.patch_workspace(temp_root),
+                self.assertRaisesRegex(ValueError, "missing canonical Skill file skill/SKILL.md"),
+            ):
+                skill_workspace.discover_skills()
 
     def test_incomplete_collection_skill_is_rejected(self) -> None:
         with TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             (temp_root / "repos" / "collection" / "skills" / "sample").mkdir(parents=True)
-            with self.patch_workspace(temp_root):
-                with self.assertRaisesRegex(ValueError, "missing canonical collection Skill file"):
-                    skill_workspace.discover_skills()
+            with (
+                self.patch_workspace(temp_root),
+                self.assertRaisesRegex(ValueError, "missing canonical collection Skill file"),
+            ):
+                skill_workspace.discover_skills()
 
     def test_ambiguous_repository_layout_is_rejected(self) -> None:
         with TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             create_standalone_skill(temp_root, "sample")
             (temp_root / "repos" / "sample" / "skills").mkdir()
-            with self.patch_workspace(temp_root):
-                with self.assertRaisesRegex(ValueError, "ambiguous Skill repository layout"):
-                    skill_workspace.discover_skills()
+            with (
+                self.patch_workspace(temp_root),
+                self.assertRaisesRegex(ValueError, "ambiguous Skill repository layout"),
+            ):
+                skill_workspace.discover_skills()
 
     def test_collection_skill_directory_must_match_name(self) -> None:
         with TemporaryDirectory() as temp_dir:

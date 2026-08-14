@@ -65,6 +65,10 @@ jobs:
         env:
           AGENT_SKILLS_MARKETPLACE_SOURCE: ${{ github.workspace }}/repos/agent-skills
         run: bash scripts/install-agent-skills-plugin.sh
+      - name: Re-run Plugin bootstrap
+        env:
+          AGENT_SKILLS_MARKETPLACE_SOURCE: ${{ github.workspace }}/repos/agent-skills
+        run: bash scripts/install-agent-skills-plugin.sh
       - name: Verify installed Plugin
         shell: bash
         run: |

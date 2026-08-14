@@ -118,7 +118,7 @@ git add -n .
 ## CI責務
 
 - 親CI: 親のPython・shell・設定、探索/検証/linkロジック、Plugin bootstrap script、0件動作、一時fixture、standalone template、親セキュリティ設定。
-- `agent-skills` Plugin横断検証: Codex / Claude Codeの実CLIを使い、`repos/agent-skills`等のlocal marketplaceから導入して確認する。
+- `agent-skills` Plugin横断検証: Codex / Claude Codeの実CLIでpublic default sourceからの導入・再実行を確認し、local marketplaceへのsource切替とpublic sourceへの復帰も検証する。
 - source repository側CI: Skill本体、固有script、依存、tests、fixtures、demo、manifest、release、配布物。
 
 設計判断は`docs/adr/0001-polyrepo-workspace.md`と`docs/adr/0002-skill-collection-repositories.md`、repository運用は`docs/skill-repository-management.md`を参照してください。

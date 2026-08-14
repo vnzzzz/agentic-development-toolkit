@@ -72,23 +72,64 @@ def load_skill(repository_root: Path, skill_root: Path, layout: str) -> Skill:
     )
 
 
+def load_collection_skills(
+    repository_root: Path,
+    collection_root: Path,
+    layout: str,
+) -> list[Skill]:
+    if not collection_root.is_dir():
+        raise ValueError(f"{collection_root}: collection Skill root must be a directory")
+
+    skills: list[Skill] = []
+    for skill_root in sorted(path for path in collection_root.iterdir() if path.is_dir()):
+        skill_file = skill_root / "SKILL.md"
+        if not skill_file.is_file():
+            raise ValueError(f"{skill_root}: missing canonical collection Skill file SKILL.md")
+        skills.append(load_skill(repository_root, skill_root, layout))
+    return skills
+
+
+def discover_plugin_repository_skills(repository_root: Path, plugins_root: Path) -> list[Skill]:
+    if not plugins_root.is_dir():
+        raise ValueError(f"{plugins_root}: Plugin root must be a directory")
+
+    skills: list[Skill] = []
+    found_skill_collection = False
+    for plugin_root in sorted(path for path in plugins_root.iterdir() if path.is_dir()):
+        collection_root = plugin_root / "skills"
+        if not collection_root.exists():
+            continue
+        found_skill_collection = True
+        skills.extend(load_collection_skills(repository_root, collection_root, "plugin-collection"))
+
+    if not found_skill_collection:
+        raise ValueError(
+            f"{repository_root}: plugins/ exists but no plugins/<plugin-name>/skills/ collection was found"
+        )
+    return skills
+
+
 def discover_repository_skills(repository_root: Path) -> list[Skill]:
     repository_root_skill = repository_root / "SKILL.md"
     if repository_root_skill.is_file():
         raise ValueError(
             f"{repository_root_skill}: repository-root SKILL.md is not supported; "
-            "use skill/SKILL.md for a standalone repository or "
-            "skills/<skill-name>/SKILL.md for a collection repository"
+            "use skill/SKILL.md for a standalone repository, "
+            "skills/<skill-name>/SKILL.md for a collection repository, or "
+            "plugins/<plugin-name>/skills/<skill-name>/SKILL.md for a Plugin repository"
         )
 
     standalone_root = repository_root / "skill"
     collection_root = repository_root / "skills"
+    plugins_root = repository_root / "plugins"
     standalone_exists = standalone_root.exists()
     collection_exists = collection_root.exists()
+    plugins_exists = plugins_root.exists()
 
-    if standalone_exists and collection_exists:
+    detected_layouts = sum((standalone_exists, collection_exists, plugins_exists))
+    if detected_layouts > 1:
         raise ValueError(
-            f"{repository_root}: ambiguous Skill repository layout; both skill/ and skills/ exist"
+            f"{repository_root}: ambiguous Skill repository layout; use exactly one of skill/, skills/, or plugins/"
         )
 
     if standalone_exists:
@@ -100,19 +141,14 @@ def discover_repository_skills(repository_root: Path) -> list[Skill]:
         return [load_skill(repository_root, standalone_root, "standalone")]
 
     if collection_exists:
-        if not collection_root.is_dir():
-            raise ValueError(f"{collection_root}: collection Skill root must be a directory")
-        skills: list[Skill] = []
-        for skill_root in sorted(path for path in collection_root.iterdir() if path.is_dir()):
-            skill_file = skill_root / "SKILL.md"
-            if not skill_file.is_file():
-                raise ValueError(f"{skill_root}: missing canonical collection Skill file SKILL.md")
-            skills.append(load_skill(repository_root, skill_root, "collection"))
-        return skills
+        return load_collection_skills(repository_root, collection_root, "collection")
+
+    if plugins_exists:
+        return discover_plugin_repository_skills(repository_root, plugins_root)
 
     raise ValueError(
-        f"{repository_root}: missing supported Skill layout; expected skill/SKILL.md "
-        "or skills/<skill-name>/SKILL.md"
+        f"{repository_root}: missing supported Skill layout; expected skill/SKILL.md, "
+        "skills/<skill-name>/SKILL.md, or plugins/<plugin-name>/skills/<skill-name>/SKILL.md"
     )
 
 

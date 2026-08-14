@@ -13,7 +13,7 @@ This parent repository provides a workspace for independently managed Agent Skil
 - Do not add credentials, host SSH mounts, Docker socket mounts, cloud credential mounts, or permissive agent flags.
 - Do not weaken validation or security checks merely to make a failing check pass.
 - Prefer the Agent Skills open format. Agent-specific frontmatter is allowed only when documented and harmless to the other agent.
-- Do not add submodules for mutable development repositories. Pinning review済み shared revisions for workspace consumption is a separate concern.
+- Do not add submodules for mutable development repositories. Pinning reviewed shared revisions for workspace consumption is a separate concern.
 
 ## Required checks
 

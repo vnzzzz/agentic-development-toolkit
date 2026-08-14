@@ -57,6 +57,8 @@ jobs:
           repository: vnzzzz/agent-skills
           ref: agent/issue-9-dual-plugin
           path: repos/agent-skills
+      - name: Validate provider metadata
+        run: python3 repos/agent-skills/scripts/validate-plugin.py
       - name: Install pinned agent CLIs
         run: bash scripts/install-agent-clis.sh
       - name: Validate Claude Code Plugin

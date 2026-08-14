@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class RepositoryTests(unittest.TestCase):
     def test_skill_file_exists(self) -> None:
         self.assertTrue((ROOT / "skill" / "SKILL.md").is_file())
+        self.assertFalse((ROOT / "SKILL.md").exists())
 
     def test_skill_has_no_credential_files(self) -> None:
         forbidden = {".env", ".env.local", "auth.json", "credentials.json", "id_rsa", "id_ed25519"}

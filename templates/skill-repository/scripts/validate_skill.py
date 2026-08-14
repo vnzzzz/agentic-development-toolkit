@@ -7,6 +7,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_FILE = ROOT / "skill" / "SKILL.md"
+REPOSITORY_ROOT_SKILL = ROOT / "SKILL.md"
 NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
@@ -36,6 +37,8 @@ def main() -> int:
     name = values.get("name", "")
     description = values.get("description", "")
     errors: list[str] = []
+    if REPOSITORY_ROOT_SKILL.exists():
+        errors.append("repository-root SKILL.md is not supported; use skill/SKILL.md")
     if not NAME_PATTERN.fullmatch(name) or len(name) > 64:
         errors.append("name must be <=64 characters and use lowercase letters, digits, and hyphens")
     if ROOT.name != name:

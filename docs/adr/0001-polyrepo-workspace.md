@@ -13,7 +13,7 @@ The parent repository must remain usable immediately after clone, when no child 
 
 1. Use `skills/` as a local workspace for independent child repositories.
 2. Ignore `skills/*` in the parent, except `skills/README.md` and an optional `.gitkeep`.
-3. Put each child repository's distributable Skill at `skills/<repository>/skill/SKILL.md`.
+3. Put each child repository's distributable Skill at `skills/<repository>/skill/SKILL.md`; reject repository-root `SKILL.md` files and incomplete child layouts.
 4. Generate relative links from `.claude/skills/` and `.agents/skills/` to the same child `skill/` directory.
 5. Treat zero local Skills as a valid parent state. Validation, linking, diagnosis, tests, and CI must succeed in that state.
 6. Limit parent automation to the Dev Container, discovery tooling, templates, parent tests, documentation, and parent security settings.

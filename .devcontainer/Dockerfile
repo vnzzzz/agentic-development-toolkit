@@ -20,8 +20,8 @@ RUN set -eux; \
         zip; \
     rm -rf /var/lib/apt/lists/*
 
-# Create the shared virtual environment. Repository-controlled dependencies are
-# installed later by the non-root post-create hook.
+# Create a parent-workspace virtual environment. Child Skill repositories own
+# their dependencies and do not install packages during container creation.
 RUN python -m venv /opt/venv \
     && chown -R vscode:vscode /opt/venv
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import json
 import os
 from pathlib import Path
 import re
@@ -66,22 +65,21 @@ def discover_skills() -> list[Skill]:
         return skills
 
     for repository_root in sorted(path for path in SKILLS_DIR.iterdir() if path.is_dir()):
-        candidates = [
-            repository_root / "skill" / "SKILL.md",
-            repository_root / "SKILL.md",
-        ]
-        matches = [path for path in candidates if path.is_file()]
-        if not matches:
-            continue
-        if len(matches) != 1:
+        skill_file = repository_root / "skill" / "SKILL.md"
+        repository_root_skill = repository_root / "SKILL.md"
+        if repository_root_skill.is_file():
             raise ValueError(
-                f"{repository_root}: both repository-root and skill/SKILL.md exist; choose one distribution root"
+                f"{repository_root_skill}: repository-root SKILL.md is not supported; "
+                "move the distributable Skill to skill/SKILL.md"
             )
-        skill_root = matches[0].parent
-        metadata = parse_frontmatter(matches[0])
+        if not skill_file.is_file():
+            raise ValueError(
+                f"{repository_root}: missing canonical Skill file skill/SKILL.md"
+            )
+        metadata = parse_frontmatter(skill_file)
         name = metadata.get("name", "")
         description = metadata.get("description", "")
-        skills.append(Skill(name, repository_root, skill_root, description))
+        skills.append(Skill(name, repository_root, skill_file.parent, description))
     return skills
 
 
@@ -211,13 +209,35 @@ def command_doctor() -> int:
         first_line = completed.stdout.strip().splitlines()[0] if completed.stdout.strip() else path
         print(f"{executable}: {first_line}")
 
+    status = 0
     print("skills:")
-    for skill in discover_skills():
+    try:
+        skills = discover_skills()
+    except (OSError, ValueError) as exc:
+        print(f"- discovery failed: {exc}")
+        skills = []
+        status = 1
+
+    if not skills and status == 0:
+        print("- none")
+
+    for skill in skills:
         git_marker = "independent-git" if (skill.repository_root / ".git").exists() else "local-directory"
+        errors = validate_skill(skill)
+        if errors:
+            status = 1
+            display_name = skill.name or "<unnamed>"
+            print(
+                f"- {display_name}: {skill.skill_root.relative_to(ROOT)} "
+                f"[{git_marker}, invalid]"
+            )
+            for error in errors:
+                print(f"  - {error}")
+            continue
         print(f"- {skill.name}: {skill.skill_root.relative_to(ROOT)} [{git_marker}]")
 
     print(f"checked_at: {datetime.now(timezone.utc).isoformat()}")
-    return 0
+    return status
 
 
 def build_parser() -> argparse.ArgumentParser:

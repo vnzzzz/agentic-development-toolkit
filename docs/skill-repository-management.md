@@ -22,7 +22,7 @@ make validate
 make link-skills
 ```
 
-Both generated links point to the child's same `skill/` directory.
+Both generated links point to the child's same `skill/` directory. The parent accepts only `skill/SKILL.md`; a repository-root `SKILL.md` or a child directory without the canonical file is reported as a configuration error.
 
 ## Parent Git boundary
 

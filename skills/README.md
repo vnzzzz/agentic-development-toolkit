@@ -12,7 +12,7 @@ cp -R templates/skill-repository skills/<skill-name>
 
 既存Skillは、実在するリポジトリURLを使って`skills/<skill-name>`へcloneします。親ワークスペースは子リポジトリのURLや存在を仮定しません。
 
-作成またはclone後、同じ`skill/`をClaude CodeとCodexへ公開します。
+作成またはclone後、正規配置`skills/<skill-name>/skill/SKILL.md`を用意し、同じ`skill/`をClaude CodeとCodexへ公開します。リポジトリ直下の`SKILL.md`は使用しません。
 
 ```bash
 make validate

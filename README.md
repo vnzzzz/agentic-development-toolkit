@@ -18,7 +18,7 @@ Claude CodeとCodexの両方でAgent Skillを開発するための親ワーク�
 └── .agents/skills/             # Codex用の生成リンク
 ```
 
-`skills/*`、`.claude/skills/*`、`.agents/skills/*`は親Gitの管理対象外です。Skillの正本は各ローカルリポジトリの`skill/`に置き、両エージェントはその同じディレクトリを参照します。
+`skills/*`、`.claude/skills/*`、`.agents/skills/*`は親Gitの管理対象外です。Skillの正本は各ローカルリポジトリの`skill/SKILL.md`に置き、両エージェントはその同じ`skill/`ディレクトリを参照します。リポジトリ直下の`SKILL.md`や、`skill/SKILL.md`を持たない子ディレクトリは配置ミスとして検証エラーになります。
 
 ## Dev Container
 
@@ -55,7 +55,7 @@ make validate       # ローカルSkillのfrontmatterと配布境界を検証。
 make link-skills    # Claude Code/Codex双方の探索リンクを同期。0件なら古いリンクを削除
 make test           # 親のunit testと親セキュリティ監査だけを実行
 make audit          # 親workflow、Dev Container、親管理ファイルを監査
-make doctor         # ツールとローカルSkill一覧を表示。0件でも成功
+make doctor         # ツールとローカルSkill一覧を表示。0件は成功、不正配置は診断して失敗
 ```
 
 Skill固有の依存導入、テスト、demo、manifest、release、配布物生成は、各`skills/<skill-name>`内で実行します。

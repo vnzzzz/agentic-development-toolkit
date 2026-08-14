@@ -54,6 +54,34 @@ class WorkspaceTests(unittest.TestCase):
                 self.assertEqual([], skill_workspace.validate_skill(skills[0]))
                 self.assertEqual(skill_root, skills[0].skill_root)
 
+    def test_repository_root_skill_is_rejected(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            repository = temp_root / "skills" / "sample"
+            repository.mkdir(parents=True)
+            (repository / "SKILL.md").write_text(
+                "---\nname: sample\ndescription: Noncanonical fixture.\n---\n",
+                encoding="utf-8",
+            )
+            with (
+                patch.object(skill_workspace, "ROOT", temp_root),
+                patch.object(skill_workspace, "SKILLS_DIR", temp_root / "skills"),
+            ):
+                with self.assertRaisesRegex(ValueError, "repository-root SKILL.md is not supported"):
+                    skill_workspace.discover_skills()
+
+    def test_incomplete_child_repository_is_rejected(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            repository = temp_root / "skills" / "sample"
+            repository.mkdir(parents=True)
+            with (
+                patch.object(skill_workspace, "ROOT", temp_root),
+                patch.object(skill_workspace, "SKILLS_DIR", temp_root / "skills"),
+            ):
+                with self.assertRaisesRegex(ValueError, "missing canonical Skill file skill/SKILL.md"):
+                    skill_workspace.discover_skills()
+
     def test_frontmatter_requires_delimiters(self) -> None:
         with TemporaryDirectory() as temp_dir:
             path = Path(temp_dir) / "SKILL.md"
@@ -109,6 +137,44 @@ class WorkspaceTests(unittest.TestCase):
                 self.assertEqual(0, skill_workspace.command_doctor())
             self.assertIn("skills:\n", output.getvalue())
 
+    def test_doctor_reports_invalid_skill_without_traceback(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            skill_file = temp_root / "skills" / "sample" / "skill" / "SKILL.md"
+            skill_file.parent.mkdir(parents=True)
+            skill_file.write_text("name: invalid\n", encoding="utf-8")
+            with (
+                patch.object(skill_workspace, "ROOT", temp_root),
+                patch.object(skill_workspace, "SKILLS_DIR", temp_root / "skills"),
+                patch.object(skill_workspace.shutil, "which", return_value=None),
+                redirect_stdout(StringIO()) as output,
+            ):
+                self.assertEqual(1, skill_workspace.command_doctor())
+            diagnostics = output.getvalue()
+            self.assertIn("skills:\n- discovery failed:", diagnostics)
+            self.assertIn("missing opening YAML frontmatter delimiter", diagnostics)
+            self.assertNotIn("Traceback", diagnostics)
+
+    def test_doctor_reports_frontmatter_validation_errors(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            skill_root = temp_root / "skills" / "sample" / "skill"
+            skill_root.mkdir(parents=True)
+            (skill_root / "SKILL.md").write_text(
+                "---\nname: sample\ndescription:\n---\n",
+                encoding="utf-8",
+            )
+            with (
+                patch.object(skill_workspace, "ROOT", temp_root),
+                patch.object(skill_workspace, "SKILLS_DIR", temp_root / "skills"),
+                patch.object(skill_workspace.shutil, "which", return_value=None),
+                redirect_stdout(StringIO()) as output,
+            ):
+                self.assertEqual(1, skill_workspace.command_doctor())
+            diagnostics = output.getvalue()
+            self.assertIn("[local-directory, invalid]", diagnostics)
+            self.assertIn("required frontmatter field 'description' is empty", diagnostics)
+
     def test_devcontainer_is_simple_and_supports_both_agents(self) -> None:
         dockerfile = (ROOT / ".devcontainer" / "Dockerfile").read_text(encoding="utf-8")
         self.assertLess(dockerfile.index("/etc/apt/sources.list.d/yarn.list"), dockerfile.index("    apt-get update;"))
@@ -156,6 +222,42 @@ class WorkspaceTests(unittest.TestCase):
         ):
             self.assertIn(expected, gitignore)
         self.assertFalse((ROOT / ".gitmodules").exists())
+
+    @unittest.skipUnless(shutil.which("git"), "git is required for ignore-boundary validation")
+    def test_parent_gitignore_semantics_exclude_children_and_generated_links(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            repository = Path(temp_dir)
+            shutil.copy2(ROOT / ".gitignore", repository / ".gitignore")
+            (repository / "skills" / "sample" / "skill").mkdir(parents=True)
+            (repository / "skills" / "sample" / "skill" / "SKILL.md").write_text(
+                "fixture", encoding="utf-8"
+            )
+            (repository / "skills" / "README.md").write_text("tracked", encoding="utf-8")
+            for discovery in (".claude", ".agents"):
+                path = repository / discovery / "skills" / "sample"
+                path.parent.mkdir(parents=True)
+                path.write_text("generated", encoding="utf-8")
+            subprocess.run(["git", "init", "-q"], cwd=repository, check=True)
+
+            ignored = (
+                "skills/sample/skill/SKILL.md",
+                ".claude/skills/sample",
+                ".agents/skills/sample",
+            )
+            for relative in ignored:
+                completed = subprocess.run(
+                    ["git", "check-ignore", "--no-index", "-q", relative],
+                    cwd=repository,
+                    check=False,
+                )
+                self.assertEqual(0, completed.returncode, relative)
+
+            readme = subprocess.run(
+                ["git", "check-ignore", "--no-index", "-q", "skills/README.md"],
+                cwd=repository,
+                check=False,
+            )
+            self.assertEqual(1, readme.returncode)
 
     def test_parent_automation_does_not_own_local_skills(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")

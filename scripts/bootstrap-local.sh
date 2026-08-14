@@ -13,6 +13,6 @@ Run:
   source .venv/bin/activate
   make test
 
-Claude Code and Codex CLI are not installed by this script. Local Skill
+Claude Code and Codex CLI are not installed by this script. Local Skill source
 repositories own their dependency installation and tests.
 MESSAGE

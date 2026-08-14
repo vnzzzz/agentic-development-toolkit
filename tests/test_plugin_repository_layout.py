@@ -79,6 +79,53 @@ class PluginRepositoryLayoutTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "ambiguous Skill repository layout"):
                 skill_workspace.discover_repository_skills(repository)
 
+    def test_rejects_symlinked_plugin_root(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            repository = temp_root / "repos" / "shared-marketplace"
+            repository.mkdir(parents=True)
+            external_plugins = temp_root / "external-plugins"
+            write_skill(external_plugins / "shared" / "skills" / "readable-code", "readable-code")
+            (repository / "plugins").symlink_to(external_plugins, target_is_directory=True)
+
+            with self.patch_workspace(temp_root):
+                with self.assertRaisesRegex(ValueError, "Plugin root must not be a symlink"):
+                    skill_workspace.discover_skills()
+
+    def test_rejects_symlinked_plugin_skill_directory(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            repository = temp_root / "repos" / "shared-marketplace"
+            collection = repository / "plugins" / "shared" / "skills"
+            collection.mkdir(parents=True)
+            external_skill = temp_root / "external-skill"
+            write_skill(external_skill, "readable-code")
+            (collection / "readable-code").symlink_to(external_skill, target_is_directory=True)
+
+            with self.patch_workspace(temp_root):
+                with self.assertRaisesRegex(
+                    ValueError, "collection Skill directory must not be a symlink"
+                ):
+                    skill_workspace.discover_skills()
+
+    def test_rejects_symlinked_source_repository_root(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            repos = temp_root / "repos"
+            repos.mkdir()
+            external_repository = temp_root / "external-repository"
+            write_skill(
+                external_repository / "plugins" / "shared" / "skills" / "readable-code",
+                "readable-code",
+            )
+            (repos / "shared-marketplace").symlink_to(
+                external_repository, target_is_directory=True
+            )
+
+            with self.patch_workspace(temp_root):
+                with self.assertRaisesRegex(ValueError, "source repository root must not be a symlink"):
+                    skill_workspace.discover_skills()
+
 
 if __name__ == "__main__":
     unittest.main()

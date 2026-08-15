@@ -1,44 +1,58 @@
 # 共通Dev Container Feature
 
-`agent-dev`は、Claude CodeとCodexを利用するprojectで共通する開発環境をDev Container Featureとして提供します。
+`agent-dev`は、Claude CodeとCodexを利用するprojectへ共通開発環境を追加するDev Container Featureです。
 
-各projectは自身をVS Code workspace / Git repository rootとして直接開き、project固有runtimeやserviceだけをローカルの`.devcontainer/devcontainer.json`で定義します。
+consumer repositoryは自身をVS Code workspace / Git rootとして直接開きます。`agent-dev`はproject固有runtimeを置き換えず、Agent開発に共通するtoolと認証状態だけを追加します。
 
-## 責務
+## Scope
 
-`agent-dev`は次を管理します。
+`agent-dev`は次を提供します。
 
-- Node.js 22とGitHub CLIを公式Dev Container Featureへの依存として導入する。
-- Claude CodeとCodex CLIを既定のexact versionで導入する。
-- `git`、`jq`、`make`、`shellcheck`、`unzip`、`zip`などの共通CLIを導入する。
-- Claude Code、Codex、GitHub CLIの認証状態を相互に分離したnamed volumeへ保存する。
-- Claude CodeとCodexのVS Code extensionを追加する。
-- container作成後にpublic `vnzzzz/agent-skills` PluginをClaude CodeとCodexへ導入する。
+- Node.js 22
+- GitHub CLI
+- versionを固定したClaude Code / Codex CLI
+- `git`、`jq`、`make`、`shellcheck`、`unzip`、`zip`などの共通CLI
+- Claude Code / Codex / GitHub CLIの認証状態を保持するnamed volume
+- Claude Code / CodexのVS Code extension
+- container作成後のpublic `vnzzzz/agent-skills` Plugin bootstrap
 
-Python、Go、project固有のNode.js設定、database、port、project固有extensionなどはconsumer repositoryの責務です。
+現時点のinstall scriptはDebian / Ubuntu系Dev Container imageを対象とします。
 
-現時点のFeature install scriptはDebian / Ubuntu系のDev Container imageを対象とします。
+次はconsumer repositoryの責務です。
 
-## 利用方法
+- Python、Goなどのproject runtime
+- project固有のNode.js設定
+- database、service、port
+- project固有dependency
+- project固有VS Code extension / setting
 
-初回GHCR release後は、各projectから次のように参照します。
+## Consumer workflow
 
-```json
-{
-  "name": "example-project",
-  "image": "mcr.microsoft.com/devcontainers/base:bookworm",
-  "features": {
-    "ghcr.io/vnzzzz/agentic-development-toolkit/agent-dev:1": {}
-  },
-  "remoteUser": "vscode"
-}
-```
+1. `.devcontainer/devcontainer.json`からmajor versionを参照します。
 
-project固有runtimeが必要な場合は、そのprojectの`features`へ追加します。`agent-dev`のためにproject sourceを別workspace配下へcloneする必要はありません。
+   ```json
+   {
+     "name": "example-project",
+     "image": "mcr.microsoft.com/devcontainers/base:bookworm",
+     "features": {
+       "ghcr.io/vnzzzz/agentic-development-toolkit/agent-dev:1": {}
+     },
+     "remoteUser": "vscode"
+   }
+   ```
 
-consumer repositoryでは`.devcontainer-lock.json`をcommitし、実際に解決したFeature versionとdigestを固定します。
+2. Dev Containerをbuildし、生成された`.devcontainer-lock.json`をcommitします。
+3. 必要に応じてClaude Code、Codex、GitHub CLIへloginします。
+4. project固有runtimeやserviceはconsumer側のDev Container設定へ追加します。
 
-## 認証状態の永続化とsecurity boundary
+`agent-dev:1`のようにmajor versionを指定しても、lockfileが実際に解決したFeature versionとdigestを固定します。GHCR側の`1` tagが更新されても、lockfileを更新するまで既存projectのbuildは同じartifactを利用します。
+
+## Security constraints
+
+- Feature sourceやGHCR artifactへcredential、token、認証済みconfigを含めない。
+- hostのcredential directory、SSH directory、Docker socketをbind mountしない。
+- 認証済みcontainerはtrusted repositoryでのみ利用する。
+- 未確認のscriptやdependencyをcredential access可能な状態で実行しない。
 
 Featureは次のnamed volumeをmountします。
 
@@ -46,36 +60,95 @@ Featureは次のnamed volumeをmountします。
 - Codex: `agentic-dev-codex-${devcontainerId}`
 - GitHub CLI: `agentic-dev-gh-${devcontainerId}`
 
-`${devcontainerId}`はDev Containerごとに一意でrebuild間では安定するため、認証状態をrebuild後も保持しながら別Dev Containerとは分離できます。
+`${devcontainerId}`はDev Containerごとに分かれ、rebuild間では安定します。volume名やmount先は公開情報であり、credentialそのものではありません。
 
-Feature sourceやGHCR artifactにcredential、token、認証済みconfigを含めません。公開されるのはvolume名のpattern、container内のmount先、環境変数などの構成情報だけです。hostの`~/.ssh`や各CLIのcredential directoryをbind mountしません。
+詳細なtrust boundaryは[セキュリティポリシー](../SECURITY.md)を参照してください。
 
-一方、認証済みDev Container内で同じuser権限により実行されるcodeは、そのcontainerの認証状態へアクセスできます。このため、信頼できるrepositoryだけで利用し、未確認のscriptやdependencyをcredential access可能な状態で実行しないことを前提とします。
+## Versioning
 
-認証状態を破棄する場合は対象Dev Containerを削除したうえで対応するnamed volumeを削除し、必要に応じてprovider側でもtoken/sessionをrevokeします。
+Feature versionは`src/agent-dev/devcontainer-feature.json`のSemVerで管理します。
 
-## version管理
+- patch: bug fix、CLI patch更新など後方互換な修正
+- minor: 後方互換な機能追加
+- major: consumer側の変更が必要なbreaking change
 
-Feature自身は`src/agent-dev/devcontainer-feature.json`のSemVerで管理します。Claude CodeとCodex CLIの既定versionは同じmetadataに明示し、`package.json`のversion pinとCIで同期を検証します。
+Claude Code / Codexの既定versionはFeature metadataと`package.json`の両方で固定し、CIで一致を検証します。
 
-既定versionやFeatureの挙動を変更する場合はFeature versionも更新し、Feature CIで実containerへのinstallを確認してからreleaseします。
+published exact versionはimmutableとして扱います。同じ`1.0.0`を異なる内容で再publishしません。
 
-## Feature authoring
+## Consumer update
 
-このrepository自身の`.devcontainer/`はbootstrap用の最小authoring環境であり、配布対象の`agent-dev`を自己参照しません。Node.js、GitHub CLI、Dev Container CLIを提供し、Feature本体の検証は`src/`と`test/`を直接対象にします。
+新しいFeature versionが公開されても、commit済みlockfileは自動では変わりません。
 
-静的検証は`make validate`、Dockerが利用できる環境での実container testは`make test`で実行します。GitHub Actionsでは同じFeatureを`devcontainer features test`で検証します。
+更新候補の確認:
 
-## release
+```bash
+devcontainer outdated
+```
 
-Featureの正本は`src/agent-dev/`です。releaseは`.github/workflows/release-feature.yml`をGitHub Actionsから`main`で手動実行します。
+lockfileの更新:
 
-publishにはworkflow固有の`GITHUB_TOKEN`と`packages: write`を利用し、個人PATをCI secretとして保存しません。Dev Containers公式Actionが`src/`配下のFeatureをOCI artifactとしてGHCRへpublishします。
+```bash
+devcontainer upgrade
+```
 
-publish先は次です。
+更新後はconsumer repositoryのCIでDev Container buildを確認し、lockfile差分を通常のcode changeとしてreviewします。major versionを`1`で指定しているconsumerは`2.x`へ自動移行しません。
+
+## Release workflow
+
+Featureの正本は`src/agent-dev/`です。releaseは`.github/workflows/release-feature.yml`を`main`から手動実行します。
+
+1. release対象の変更で`devcontainer-feature.json`のSemVerを更新する。
+2. `make validate`を実行する。
+3. Dockerが利用できる場合は`make test`を実行する。
+4. PRをmergeする。
+5. `main`から`release-feature` workflowを実行する。
+6. workflowがGHCRに同じexact versionが存在しないことを検証する。
+7. Dev Containers公式ActionでGHCRへpublishする。
+
+publish先:
 
 ```text
 ghcr.io/vnzzzz/agentic-development-toolkit/agent-dev
 ```
 
-初回publish後、匿名pullさせる場合はGitHub package settingsでvisibilityをpublicへ変更します。visibility変更はrelease workflowの責務には含めません。
+release workflowは`GITHUB_TOKEN`と`packages: write`を利用します。個人PATは使用しません。
+
+version確認はfail-closedです。
+
+- exact versionが既に存在する: release失敗
+- exact versionが存在しない: publishへ進む
+- registryの照会結果を判定できない: release失敗
+
+初回publish時のpackageはprivateです。匿名pullさせる場合はGitHubのPackage settingsでpackage visibilityをpublicへ変更します。visibilityはpackage単位なので、同じpackageへ追加される後続versionごとにpublic化を繰り返す必要はありません。
+
+## Authoring workflow
+
+このrepository自身の`.devcontainer/`はFeature authoring用の最小環境です。未releaseの`agent-dev`を自己参照しません。
+
+静的検証:
+
+```bash
+make validate
+```
+
+実container test:
+
+```bash
+make test
+```
+
+`make validate`は次を検証します。
+
+- Feature metadata JSON
+- shell syntax / ShellCheck
+- Claude Code / Codex version pinの整合
+- release version guardの分岐
+
+`make test`はさらに`devcontainer features test`でFeatureを実containerへ導入し、Agent CLI、`agent-skills` Plugin bootstrap、認証volumeの書き込み可能性を確認します。
+
+## Supporting documents
+
+- repositoryの入口: [README.md](../README.md)
+- trust boundaryとcredential: [SECURITY.md](../SECURITY.md)
+- repository変更時の制約: [AGENTS.md](../AGENTS.md)

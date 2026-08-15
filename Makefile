@@ -1,4 +1,3 @@
-DEVCONTAINER_CLI_VERSION ?= 0.88.0
 BASE_IMAGE ?= mcr.microsoft.com/devcontainers/base:bookworm
 
 .PHONY: validate test

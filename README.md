@@ -47,22 +47,16 @@ make test
 
 ## Release
 
-Feature versionは`src/agent-dev/devcontainer-feature.json`のSemVerで管理します。release前にversionを更新し、`main`から`release-feature` workflowを手動実行します。
-
-workflowは同じexact versionがGHCRに存在する場合、またはGHCRの照会結果を判定できない場合に失敗します。既存versionを上書きしません。
-
-```text
-ghcr.io/vnzzzz/agentic-development-toolkit/agent-dev
-```
+Featureは`main`からGitHub Actionsでreleaseします。versioning、再publish防止、GHCR publish、visibilityを含むrelease contractは[共通Dev Container Feature](docs/dev-container-feature.md#release-workflow)を参照してください。
 
 ## Repository layout
 
 ```text
-src/agent-dev/                 Featureの配布物
-test/agent-dev/                実container test
+src/agent-dev/                    Featureの配布物
+test/agent-dev/                   実container test
 scripts/check-release-version.sh  release前のversion検証
-.github/workflows/             CI / security / release
-docs/dev-container-feature.md  consumer / version / releaseの詳細
+.github/workflows/                CI / security / release
+docs/dev-container-feature.md     consumer / version / releaseの詳細
 ```
 
 ## Supporting documents

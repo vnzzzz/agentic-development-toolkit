@@ -24,7 +24,6 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 1
 fi
 
-rm -f /etc/apt/sources.list.d/yarn.list /etc/apt/sources.list.d/yarn.sources
 apt-get update
 apt-get install -y --no-install-recommends \
   file \

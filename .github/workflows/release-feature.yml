@@ -14,6 +14,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Dev Container CLI
+        run: npm install --global @devcontainers/cli@0.88.0
+      - name: Verify Feature version is unpublished
+        env:
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/check-release-version.sh
       - name: Publish Dev Container Features
         uses: devcontainers/action@1082abd5d2bf3a11abccba70eef98df068277772 # v1
         with:

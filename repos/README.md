@@ -36,7 +36,10 @@ make validate
 make link-skills
 ```
 
-`.claude/skills/<name>`と`.agents/skills/<name>`は、repository形式に関係なく実際のSkill rootへ直接linkされます。
+standalone / collection Skillは`.claude/skills/<name>`と`.agents/skills/<name>`から実際のSkill rootへ直接linkされます。これはmutableなauthoring用です。
+
+Plugin marketplace repositoryは探索・validation対象ですが、個別Skillをproject-local Skillとしてdirect linkしません。Plugin namespaceとpackagingを維持するため、native Plugin loadingを使用します。
+
 同じSkill名が複数repositoryまたはPluginに存在する場合はconfiguration errorです。
 
 Plugin marketplace自体を実Agentへinstallして検証する場合は、そのrepositoryをmarketplace sourceとしてPlugin bootstrapへ渡します。
@@ -47,9 +50,17 @@ AGENT_SKILLS_MARKETPLACE_SOURCE="$PWD/repos/agent-skills" \
   bash scripts/install-agent-skills-plugin.sh
 ```
 
-bootstrapは同じmarketplace名が別sourceから登録済みでも、既存marketplaceを置き換えて指定sourceから再導入します。
+bootstrapは同じmarketplace名が別sourceから登録済みでも、既存marketplaceを置き換えて指定sourceから再導入します。検証後は環境変数なしで再実行し、public default sourceへ戻します。
 
-mutableな開発用repositoryを親Gitへsubmoduleとして登録しません。親をcommitする前に境界を確認します。
+Claude CodeではPlugin rootをworking copyから直接読み込めます。
+
+```bash
+claude --plugin-dir "$PWD/repos/agent-skills/plugins/agent-skills"
+```
+
+standalone Skill repositoryでは`skill/` directory全体が配布bundleです。repository内で`make test`を実行し、隔離された`skill/`だけでもbundle boundaryが成立することを確認してください。実行可能scriptを持つ場合は、各repository側で代表fixtureを使ったruntime integration testも追加します。
+
+mutableな開発用repositoryを親Gitへsubmoduleとして登録しません。各repositoryは独立したbranch、commit、PR、CI、releaseを持ちます。親をcommitする前に境界を確認します。
 
 ```bash
 git check-ignore -v repos/<repository>/skill/SKILL.md

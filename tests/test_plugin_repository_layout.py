@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import sys
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -49,7 +51,7 @@ class PluginRepositoryLayoutTests(unittest.TestCase):
             )
             self.assertTrue(all(skill.layout == "plugin-collection" for skill in skills))
 
-    def test_links_plugin_repository_skills_for_both_agents(self) -> None:
+    def test_plugin_repository_skills_are_not_directly_linked(self) -> None:
         with TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
             skill_root = (
@@ -64,11 +66,38 @@ class PluginRepositoryLayoutTests(unittest.TestCase):
             write_skill(skill_root, "readable-code")
             discovery = (temp_root / ".claude" / "skills", temp_root / ".agents" / "skills")
 
-            with self.patch_workspace(temp_root):
+            with self.patch_workspace(temp_root), redirect_stdout(StringIO()) as output:
                 self.assertEqual(0, skill_workspace.command_link())
 
             for directory in discovery:
-                self.assertEqual(skill_root.resolve(), (directory / "readable-code").resolve())
+                self.assertFalse((directory / "readable-code").exists())
+                self.assertFalse((directory / "readable-code").is_symlink())
+            self.assertIn("Skipped 1 Plugin Skill(s)", output.getvalue())
+
+    def test_plugin_link_from_previous_workspace_state_is_removed(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            skill_root = (
+                temp_root
+                / "repos"
+                / "shared-marketplace"
+                / "plugins"
+                / "shared"
+                / "skills"
+                / "readable-code"
+            )
+            write_skill(skill_root, "readable-code")
+            discovery = (temp_root / ".claude" / "skills", temp_root / ".agents" / "skills")
+            for directory in discovery:
+                directory.mkdir(parents=True)
+                (directory / "readable-code").symlink_to(skill_root, target_is_directory=True)
+
+            with self.patch_workspace(temp_root), redirect_stdout(StringIO()):
+                self.assertEqual(0, skill_workspace.command_link())
+
+            for directory in discovery:
+                self.assertFalse((directory / "readable-code").exists())
+                self.assertFalse((directory / "readable-code").is_symlink())
 
     def test_rejects_ambiguous_root_collection_and_plugin_layout(self) -> None:
         with TemporaryDirectory() as temp_dir:

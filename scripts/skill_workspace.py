@@ -182,6 +182,11 @@ def discover_skills() -> list[Skill]:
     return skills
 
 
+def authoring_skills(skills: list[Skill]) -> list[Skill]:
+    """Return mutable Skill roots that should be exposed as direct project-local Skills."""
+    return [skill for skill in skills if skill.layout != "plugin-collection"]
+
+
 def is_relative_to(path: Path, parent: Path) -> bool:
     try:
         path.relative_to(parent)
@@ -277,7 +282,9 @@ def command_link() -> int:
     if command_validate() != 0:
         return 1
     skills = discover_skills()
-    expected_names = {skill.name for skill in skills}
+    linked_skills = authoring_skills(skills)
+    plugin_skills = [skill for skill in skills if skill.layout == "plugin-collection"]
+    expected_names = {skill.name for skill in linked_skills}
 
     for discovery_dir in DISCOVERY_DIRS:
         discovery_dir.mkdir(parents=True, exist_ok=True)
@@ -293,7 +300,7 @@ def command_link() -> int:
                 )
                 return 1
 
-        for skill in skills:
+        for skill in linked_skills:
             link = discovery_dir / skill.name
             target = relative_symlink_target(discovery_dir, skill.skill_root)
             if link.is_symlink():
@@ -302,7 +309,11 @@ def command_link() -> int:
                 link.unlink()
             link.symlink_to(target, target_is_directory=True)
 
-    print(f"Linked {len(skills)} Skill(s) for Claude Code and Codex.")
+    print(f"Linked {len(linked_skills)} authoring Skill(s) for Claude Code and Codex.")
+    if plugin_skills:
+        print(
+            f"Skipped {len(plugin_skills)} Plugin Skill(s); validate Plugin repositories through native Plugin tooling."
+        )
     return 0
 
 
@@ -344,20 +355,21 @@ def command_doctor() -> int:
 
     for skill in skills:
         git_marker = "independent-git" if (skill.repository_root / ".git").exists() else "local-directory"
+        exposure = "native-plugin" if skill.layout == "plugin-collection" else "direct-authoring"
         errors = validate_skill(skill)
         if errors:
             status = 1
             display_name = skill.name or "<unnamed>"
             print(
                 f"- {display_name}: {skill.skill_root.relative_to(ROOT)} "
-                f"[{git_marker}, {skill.layout}, invalid]"
+                f"[{git_marker}, {skill.layout}, invalid] ({exposure})"
             )
             for error in errors:
                 print(f"  - {error}")
             continue
         print(
             f"- {skill.name}: {skill.skill_root.relative_to(ROOT)} "
-            f"[{git_marker}, {skill.layout}]"
+            f"[{git_marker}, {skill.layout}] ({exposure})"
         )
 
     print(f"checked_at: {datetime.now(timezone.utc).isoformat()}")

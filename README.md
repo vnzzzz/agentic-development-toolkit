@@ -4,18 +4,7 @@ Claude CodeとCodexを利用する複数projectへ、共通のDev Container Feat
 
 各consumer repositoryは自身をVS Code workspace / Git rootとして直接開きます。このrepositoryはconsumer sourceを配下へcloneして管理する親workspaceではありません。
 
-## Scope
-
-`agent-dev`は次を提供します。
-
-- Node.js 22とGitHub CLI
-- versionを固定したClaude Code / Codex CLI
-- `git`、`jq`、`make`、`shellcheck`、`unzip`、`zip`などの共通CLI
-- Claude Code / Codex / GitHub CLIの認証状態を保持するnamed volume
-- Claude Code / CodexのVS Code extension
-- public `vnzzzz/agent-skills` Pluginのbootstrap
-
-Python、Go、database、port、project固有dependencyやextensionはconsumer repositoryで定義します。
+`agent-dev`の提供範囲、consumer責務、versioning、update、release contractは[共通Dev Container Feature](docs/dev-container-feature.md)を正本とします。
 
 ## Consumer workflow
 
@@ -32,7 +21,7 @@ GHCRへ公開されたFeatureは、consumer側の`.devcontainer/devcontainer.jso
 }
 ```
 
-consumer repositoryでは`.devcontainer-lock.json`をcommitし、解決したFeature versionとdigestを固定します。`agent-dev`の詳細な利用契約は[共通Dev Container Feature](docs/dev-container-feature.md)を参照してください。
+consumer repositoryでは`.devcontainer-lock.json`をcommitします。詳細な利用手順は[共通Dev Container Feature](docs/dev-container-feature.md#consumer-workflow)を参照してください。
 
 ## Authoring workflow
 
@@ -43,11 +32,9 @@ make validate
 make test
 ```
 
-`make validate`はmetadata、shell、CLI version整合、release version guardのtestを検証します。`make test`はさらに`devcontainer features test`で実containerへFeatureを導入します。
-
 ## Release
 
-Featureは`main`からGitHub Actionsでreleaseします。versioning、再publish防止、GHCR publish、visibilityを含むrelease contractは[共通Dev Container Feature](docs/dev-container-feature.md#release-workflow)を参照してください。
+Featureは`main`からGitHub Actionsでreleaseします。手順とrelease contractは[共通Dev Container Feature](docs/dev-container-feature.md#release-workflow)を参照してください。
 
 ## Repository layout
 
@@ -56,7 +43,7 @@ src/agent-dev/                    Featureの配布物
 test/agent-dev/                   実container test
 scripts/check-release-version.sh  release前のversion検証
 .github/workflows/                CI / security / release
-docs/dev-container-feature.md     consumer / version / releaseの詳細
+docs/dev-container-feature.md     consumer / version / releaseの正本
 ```
 
 ## Supporting documents

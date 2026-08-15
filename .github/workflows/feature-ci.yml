@@ -1,0 +1,35 @@
+name: feature-ci
+
+on:
+  push:
+    paths:
+      - "src/**"
+      - "test/**"
+      - ".github/workflows/feature-ci.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "test/**"
+      - ".github/workflows/feature-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agent-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate Feature source
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          jq -e . src/agent-dev/devcontainer-feature.json >/dev/null
+          bash -n src/agent-dev/install.sh src/agent-dev/post-create.sh test/agent-dev/test.sh
+          shellcheck src/agent-dev/install.sh src/agent-dev/post-create.sh test/agent-dev/test.sh
+      - name: Install Dev Container CLI
+        run: npm install --global @devcontainers/cli@0.88.0
+      - name: Test agent-dev Feature
+        run: devcontainer features test -f agent-dev -i mcr.microsoft.com/devcontainers/base:bookworm .

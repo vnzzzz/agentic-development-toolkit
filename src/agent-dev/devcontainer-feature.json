@@ -1,0 +1,59 @@
+{
+  "id": "agent-dev",
+  "version": "1.0.0",
+  "name": "Agent Development Environment",
+  "description": "Installs and configures the shared Claude Code, Codex, GitHub CLI, and agent-skills development environment.",
+  "documentationURL": "https://github.com/vnzzzz/agentic-development-toolkit/blob/main/docs/dev-container-feature.md",
+  "options": {
+    "claudeCodeVersion": {
+      "type": "string",
+      "default": "2.1.227",
+      "description": "Exact @anthropic-ai/claude-code npm package version."
+    },
+    "codexVersion": {
+      "type": "string",
+      "default": "0.147.0",
+      "description": "Exact @openai/codex npm package version."
+    }
+  },
+  "dependsOn": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22",
+      "installYarnUsingApt": false
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "mounts": [
+    {
+      "source": "agentic-dev-claude-${devcontainerId}",
+      "target": "/var/lib/agentic-dev/claude",
+      "type": "volume"
+    },
+    {
+      "source": "agentic-dev-codex-${devcontainerId}",
+      "target": "/var/lib/agentic-dev/codex",
+      "type": "volume"
+    },
+    {
+      "source": "agentic-dev-gh-${devcontainerId}",
+      "target": "/var/lib/agentic-dev/gh",
+      "type": "volume"
+    }
+  ],
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/var/lib/agentic-dev/claude",
+    "CODEX_HOME": "/var/lib/agentic-dev/codex",
+    "GH_CONFIG_DIR": "/var/lib/agentic-dev/gh",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "DISABLE_AUTOUPDATER": "1"
+  },
+  "postCreateCommand": "/usr/local/share/agentic-dev/post-create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "openai.chatgpt"
+      ]
+    }
+  }
+}

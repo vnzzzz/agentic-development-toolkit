@@ -4,6 +4,14 @@ Claude CodeとCodexの両方でAgent Skillを開発するためのワークス�
 
 この親リポジトリは、Dev Container、Skillの探索・検証ツール、standalone Skill用テンプレート、親CIを管理します。実際に開発するSkillの正本は、`repos/`配下へ配置する独立したSkillソースリポジトリが持ちます。
 
+## 共通Dev Container Featureへの移行
+
+各projectを自身のVS Code workspace / Git rootとして直接開けるようにするため、共通開発環境を`src/agent-dev/`のDev Container Featureへ切り出しています。
+
+Featureはrepositoryを`agentic-development-toolkit`へrenameした後、GitHub ActionsからGHCRへpublishします。各projectにはproject固有のruntimeと共通Feature参照だけを含む薄い`.devcontainer/devcontainer.json`を置きます。
+
+現在の`repos/`を利用する親workspace方式は、consumer projectの移行が完了するまで既存開発環境として残します。Featureの責務、利用方法、認証volume、release手順は[共通Dev Container Feature](docs/dev-container-feature.md)を参照してください。
+
 ## はじめに
 
 推奨する利用方法はDev Containerです。
@@ -57,6 +65,7 @@ Skill固有のtestや依存関係の導入は、各source repository側で実行
 
 ## 文書
 
+- [共通Dev Container Feature](docs/dev-container-feature.md): 共通Featureの責務、利用方法、認証volume、release
 - [Skillソースリポジトリの運用](docs/skill-repository-management.md): repository layout、ローカル開発、配布検証、Git / CI責務
 - [GitHub repository設定](docs/github-repository-settings.md): branch protectionやGitHub security設定
 - [セキュリティポリシー](SECURITY.md): trust modelとsecurity boundary

@@ -6,9 +6,26 @@ Agent Skillは、instructionsだけでなくscript、dependency、symlink、bina
 
 Skillを利用する前に、そのsource repositoryが配布する`SKILL.md`とruntime resourceを確認し、必要な権限と外部アクセスを把握してください。
 
+## 共通Dev Container Featureのセキュリティ制御
+
+`src/agent-dev/`のFeatureは、複数projectで再利用するAgent開発環境を配布します。
+
+- Feature sourceとGHCR artifactへcredential、token、認証済みconfigを含めない。
+- Claude Code、Codex、GitHub CLIの認証状態は相互に分離したnamed volumeへ保存する。
+- volume名には`${devcontainerId}`を含め、別Dev Containerとの認証状態共有を避ける。
+- hostのcredential directory、SSH directory、Docker socketをbind mountしない。
+- Claude CodeとCodex CLIの既定versionはFeature metadataで固定する。
+- GitHub CLIとNode.jsは公式Dev Container Featureへの依存として導入する。
+- GitHub ActionsからGHCRへpublishするときはworkflow固有の`GITHUB_TOKEN`を利用し、個人PATをCI secretへ保存しない。
+- 外部GitHub Actionsはfull commit SHAで固定する。
+
+volume名やcontainer内のmount先は秘密情報として扱いません。公開Featureからこれらの構成が分かっても、named volumeに保存されたcredentialそのものは公開されません。
+
+一方、認証済みDev Container内で同じuser権限により実行されるcodeは、そのcontainerの認証状態へアクセスできます。認証volumeを利用するDev Containerはtrusted repository向けの環境とし、未確認のrepository、script、dependencyをcredential access可能な状態で実行しないでください。
+
 ## 親ワークスペースのセキュリティ制御
 
-親リポジトリは次を管理します。
+Featureへの移行が完了するまで、既存の親ワークスペースは次を管理します。
 
 - Dev Containerはnon-rootの`vscode` userで実行する。
 - Claude Code、Codex、GitHub CLIの認証情報は相互に分離したnamed volumeへ保存する。

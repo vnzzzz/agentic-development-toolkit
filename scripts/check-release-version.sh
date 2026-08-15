@@ -21,10 +21,7 @@ fi
 version="$(jq -er '.version | select(type == "string" and length > 0)' "${FEATURE_METADATA}")"
 feature_ref="${FEATURE_REPOSITORY}:${version}"
 
-cleanup() {
-  docker logout ghcr.io >/dev/null 2>&1 || true
-}
-trap cleanup EXIT
+trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
 
 printf '%s' "${GHCR_TOKEN}" | docker login ghcr.io --username "${GHCR_USERNAME}" --password-stdin >/dev/null
 

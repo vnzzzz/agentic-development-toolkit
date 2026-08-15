@@ -6,12 +6,14 @@ on:
       - "src/**"
       - "test/**"
       - "package.json"
+      - "Makefile"
       - ".github/workflows/feature-ci.yml"
   pull_request:
     paths:
       - "src/**"
       - "test/**"
       - "package.json"
+      - "Makefile"
       - ".github/workflows/feature-ci.yml"
   workflow_dispatch:
 
@@ -24,17 +26,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install validation tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
       - name: Validate Feature source
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          jq -e . src/agent-dev/devcontainer-feature.json >/dev/null
-          bash -n src/agent-dev/install.sh src/agent-dev/post-create.sh test/agent-dev/test.sh
-          shellcheck src/agent-dev/install.sh src/agent-dev/post-create.sh test/agent-dev/test.sh
-          test "$(jq -r '.dependencies["@anthropic-ai/claude-code"]' package.json)" = \
-            "$(jq -r '.options.claudeCodeVersion.default' src/agent-dev/devcontainer-feature.json)"
-          test "$(jq -r '.dependencies["@openai/codex"]' package.json)" = \
-            "$(jq -r '.options.codexVersion.default' src/agent-dev/devcontainer-feature.json)"
+        run: make validate
       - name: Install Dev Container CLI
         run: npm install --global @devcontainers/cli@0.88.0
       - name: Test agent-dev Feature

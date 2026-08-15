@@ -1,22 +1,25 @@
 # Agentic Development Toolkit
 
-Claude Code / Codex を利用する複数project向けに、共通のDev Container Featureを提供するrepositoryです。
+Claude CodeとCodexを利用する複数projectへ、共通のDev Container Featureを配布するrepositoryです。
 
-各consumer repositoryは自身をVS Code workspace / Git rootとして直接開き、project固有runtimeやserviceだけを`.devcontainer/devcontainer.json`で定義します。このrepositoryはconsumer projectを`repos/`配下へcloneする親workspaceではありません。
+各consumer repositoryは自身をVS Code workspace / Git rootとして直接開きます。このrepositoryはconsumer sourceを配下へcloneして管理する親workspaceではありません。
 
-## 提供するもの
+## Scope
 
-- `src/agent-dev/`: 共通Dev Container Featureの正本
-- `test/agent-dev/`: Featureの実container test
-- `.github/workflows/feature-ci.yml`: metadata / shell / 実container検証
-- `.github/workflows/release-feature.yml`: GHCRへのrelease
-- `docs/dev-container-feature.md`: Featureの責務、利用方法、認証境界、release手順
+`agent-dev`は次を提供します。
 
-`agent-dev`はNode.js 22、GitHub CLI、Claude Code、Codex、共通CLI、認証状態の永続化、`vnzzzz/agent-skills` Plugin bootstrapを提供します。Python、Go、database、port、project固有extensionなどはconsumer repositoryの責務です。
+- Node.js 22とGitHub CLI
+- versionを固定したClaude Code / Codex CLI
+- `git`、`jq`、`make`、`shellcheck`、`unzip`、`zip`などの共通CLI
+- Claude Code / Codex / GitHub CLIの認証状態を保持するnamed volume
+- Claude Code / CodexのVS Code extension
+- public `vnzzzz/agent-skills` Pluginのbootstrap
 
-## 利用方法
+Python、Go、database、port、project固有dependencyやextensionはconsumer repositoryで定義します。
 
-初回release後は、consumer repositoryから次のように参照します。
+## Consumer workflow
+
+GHCRへ公開されたFeatureは、consumer側の`.devcontainer/devcontainer.json`から参照します。
 
 ```json
 {
@@ -29,32 +32,41 @@ Claude Code / Codex を利用する複数project向けに、共通のDev Contain
 }
 ```
 
-consumer repositoryでは`.devcontainer-lock.json`をcommitし、解決したFeature versionとdigestを固定します。
+consumer repositoryでは`.devcontainer-lock.json`をcommitし、解決したFeature versionとdigestを固定します。`agent-dev`の詳細な利用契約は[共通Dev Container Feature](docs/dev-container-feature.md)を参照してください。
 
-## 開発
+## Authoring workflow
 
-Feature authoring用の`.devcontainer/`は、このrepository自身のbootstrapに必要なNode.js、GitHub CLI、Dev Container CLIだけを提供します。配布対象の`agent-dev` Featureを自己参照しません。
-
-静的検証:
+このrepository自身の`.devcontainer/`はFeature authoring用の最小環境です。未releaseの`agent-dev`を自己参照せず、`src/`と`test/`を直接検証します。
 
 ```bash
 make validate
-```
-
-Dockerが利用できる環境での実container test:
-
-```bash
 make test
 ```
 
-CIでは`devcontainer features test`により、Featureのinstall、Agent CLI、`agent-skills` Plugin bootstrap、認証volumeの書き込み可能性まで検証します。
+`make validate`はmetadata、shell、CLI version整合、release version guardのtestを検証します。`make test`はさらに`devcontainer features test`で実containerへFeatureを導入します。
 
 ## Release
 
-Feature versionは`src/agent-dev/devcontainer-feature.json`のSemVerで管理します。releaseは`main`から`release-feature` workflowを手動実行し、GHCRへpublishします。
+Feature versionは`src/agent-dev/devcontainer-feature.json`のSemVerで管理します。release前にversionを更新し、`main`から`release-feature` workflowを手動実行します。
+
+workflowは同じexact versionがGHCRに存在する場合、またはGHCRの照会結果を判定できない場合に失敗します。既存versionを上書きしません。
 
 ```text
 ghcr.io/vnzzzz/agentic-development-toolkit/agent-dev
 ```
 
-詳細は[共通Dev Container Feature](docs/dev-container-feature.md)と[セキュリティポリシー](SECURITY.md)を参照してください。
+## Repository layout
+
+```text
+src/agent-dev/                 Featureの配布物
+test/agent-dev/                実container test
+scripts/check-release-version.sh  release前のversion検証
+.github/workflows/             CI / security / release
+docs/dev-container-feature.md  consumer / version / releaseの詳細
+```
+
+## Supporting documents
+
+- Featureの利用・version・release: [docs/dev-container-feature.md](docs/dev-container-feature.md)
+- trust boundaryとcredential: [SECURITY.md](SECURITY.md)
+- repository変更時の制約: [AGENTS.md](AGENTS.md)

@@ -1,31 +1,37 @@
-# Security policy
+# セキュリティポリシー
 
-## Trust model
+## 信頼モデル
 
-Agent Skills are executable supply-chain inputs. Review `SKILL.md`, bundled scripts, dependencies, and binary assets in each source repository before use.
+Agent Skillは、instructionsだけでなくscript、dependency、symlink、binary assetを含み得る実行可能なsupply-chain inputとして扱います。
 
-## Parent workspace controls
+Skillを利用する前に、そのsource repositoryが配布する`SKILL.md`とruntime resourceを確認し、必要な権限と外部アクセスを把握してください。
 
-- The Dev Container runs as the non-root `vscode` user.
-- Claude Code and Codex authentication use separate named volumes.
-- Host credential directories and the Docker socket are not mounted by repository configuration.
-- Agent CLI versions are pinned in `package.json`.
-- Dev Container startup does not initialize Git, submodules, source-repository dependencies, or source-repository tests.
-- Local Skill link generation is best-effort during post-create so an invalid local source does not prevent access to the parent environment.
-- Parent CI checks only parent code, shell scripts, configuration, templates, and security settings.
-- External GitHub Actions are pinned to full commit SHAs.
+## 親ワークスペースのセキュリティ制御
 
-## Source repository boundary
+親リポジトリは次を管理します。
 
-Directories under `repos/*` are ignored by the parent Git repository. A source repository may be standalone (`skill/SKILL.md`) or a collection (`skills/<skill-name>/SKILL.md`). Each source repository owns review and automation for its Skill files, runtime dependencies, tests, fixtures, manifests, releases, and Dependabot configuration.
+- Dev Containerはnon-rootの`vscode` userで実行する。
+- Claude CodeとCodexの認証情報は別々のnamed volumeへ保存する。
+- repository設定からhost credential directoryやDocker socketをmountしない。
+- Agent CLIのversionは`package.json`で固定する。
+- Dev Container起動時にGit初期化、submodule更新、source repository固有dependencyの導入、source repository固有testの実行を行わない。
+- post-create時のローカルSkill link生成はbest-effortとし、不正なローカルsourceが親環境そのものの利用を妨げないようにする。
+- 親CIは親のcode、shell script、configuration、template、security設定を検証し、`repos/*`のSkill固有runtimeを中央実行しない。
+- 外部GitHub Actionsはfull commit SHAで固定する。
 
-Before linking or running a third-party Skill:
+## Skillソースリポジトリとの境界
 
-1. Review its instructions, scripts, dependencies, binary assets, and symlinks.
-2. Confirm the need for network, subprocesses, credential access, and destructive writes.
-3. Run the source repository's own tests and security checks.
-4. Do not allow credentials, escaping symlinks, obfuscated code, or execution from mutable remote URLs.
+`repos/*`は親Gitからignoreされます。各source repositoryは、自身のSkill本体、runtime dependency、test、fixture、manifest、CI、security update、releaseを所有します。
 
-## Reporting
+standalone Skillでは`skill/`全体を配布バンドルとし、配布後にrepository-only fileへ依存しないことをsource repository側で検証します。Plugin repositoryでは、provider自身がPlugin metadataとnative Plugin loadingを検証します。
 
-Do not include credentials or sensitive source files in issues. Report a minimal reproduction, relevant versions, and sanitized command output.
+第三者のSkillをリンクまたは実行する前に、少なくとも次を確認してください。
+
+1. `SKILL.md`、bundled script、dependency、binary asset、symlinkを確認する。
+2. network access、subprocess、credential access、filesystem write、destructive operationが必要か確認する。
+3. source repositoryが提供するtestとsecurity checkを実行する。
+4. credential、Skill root外へescapeするsymlink、obfuscated code、mutable remote URLから直接実行されるcodeを許可しない。
+
+## セキュリティ問題の報告
+
+Issueへcredentialや機密sourceを貼り付けないでください。再現に必要な最小情報、関連version、機密情報を除去したcommand outputを共有してください。

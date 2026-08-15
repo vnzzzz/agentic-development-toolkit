@@ -1,57 +1,59 @@
-# ADR 0002: Support standalone and collection Skill source repositories
+# ADR 0002: standalone / collection Skill repositoryをサポートする
 
-- Status: Accepted; amended by ADR 0003
-- Date: 2026-08-14
+- 状態: 採用。ADR 0003により一部変更
+- 日付: 2026-08-14
 
-## Context
+## 背景
 
-ADR 0001 established a parent workspace that keeps Agent Skill source outside the parent Git history and exposes one canonical source to both Claude Code and Codex.
+ADR 0001では、Agent Skillのsourceを親Git historyの外へ置き、Claude CodeとCodexの双方から一つの正本を参照する親ワークスペースを採用した。
 
-The original implementation assumed one Skill per child repository at `skills/<repository>/skill/SKILL.md`. A new shared repository, `agent-skills`, instead acts as a collection containing multiple reusable Skills at `skills/<skill-name>/SKILL.md`.
+当初のimplementationは、`skills/<repository>/skill/SKILL.md`に1 repositoryあたり1 Skillを置く前提だった。一方、新しい共有repositoryである`agent-skills`は、`skills/<skill-name>/SKILL.md`配下に複数の再利用可能なSkillを持つcollectionとして構成されている。
 
-Replacing the standalone model with a collection-only model would discard useful support for Skills that need independent repositories, histories, dependencies, tests, and release processes. Special-casing `agent-skills` would also make the parent workspace depend on one concrete repository.
+standalone形式をcollection形式へ置き換えると、独立したrepository、history、dependency、test、release processを必要とするSkillの開発性を失う。また、`agent-skills`だけをspecial caseにすると、親ワークスペースが特定repositoryへ依存する。
 
-## Decision
+## 決定
 
-1. Treat the local placement unit as a source repository rather than a Skill and rename the parent-local placement directory from `skills/` to `repos/`.
-2. Support two repository layouts:
+以下は本ADR採用時点の決定である。Plugin repositoryの追加とPlugin Skillのdirect link停止は後続のADR 0003で変更された。
+
+1. 親ワークスペースで配置する単位をSkillではなくsource repositoryとし、ローカル配置directoryを`skills/`から`repos/`へ変更する。
+2. 次の2つのrepository layoutをサポートする。
    - standalone: `repos/<repository>/skill/SKILL.md`
    - collection: `repos/<repository>/skills/<skill-name>/SKILL.md`
-3. Keep the existing standalone repository template.
-4. Discover every Skill in both layouts and generate `.claude/skills/<name>` and `.agents/skills/<name>` links directly to the actual Skill root.
-5. Require the standalone repository directory or collection Skill directory to match the Skill `name` as applicable.
-6. Reject repository-root `SKILL.md`, repositories containing both `skill/` and `skills/`, incomplete Skill directories, and duplicate Skill names across all local repositories.
-7. Keep zero local source repositories as a valid parent state. An explicitly created but empty collection `skills/` directory is also valid.
-8. Keep mutable development source repositories ignored by the parent Git repository and do not make them submodules.
-9. Keep parent automation limited to discovery, cross-repository validation, link generation, the Dev Container, parent tests, documentation, and parent security controls.
-10. Do not hard-code `agent-skills`; collection support is a generic repository capability.
+3. 既存のstandalone repository templateを維持する。
+4. 両layoutの全Skillを探索し、`.claude/skills/<name>`と`.agents/skills/<name>`から実際のSkill rootへ直接リンクする。
+5. standalone repositoryではrepository directory名、collection repositoryではSkill directory名を、該当するSkillの`name`と一致させる。
+6. repository直下の`SKILL.md`、`skill/`と`skills/`を併置するrepository、不完全なSkill directory、ローカルrepository間で重複するSkill名を拒否する。
+7. ローカルsource repositoryが0件の状態を正常とする。明示的に作成された空のcollection `skills/` directoryも正常とする。
+8. mutableな開発用source repositoryは引き続き親Gitからignoreし、Git submoduleにはしない。
+9. 親automationの責務をdiscovery、repository横断validation、link生成、Dev Container、親test、documentation、親security controlに限定する。
+10. `agent-skills`というrepository名をhard-codeしない。collection対応はgenericなrepository capabilityとして実装する。
 
-ADR 0003 extends the workspace to Plugin marketplace repositories and separates direct Skill authoring from native Plugin distribution validation. The direct-link decision above continues to apply to standalone and collection repositories, not Plugin repository Skills.
+ADR 0003は、Plugin marketplace repositoryを追加し、direct Skill authoringとnative Plugin distribution validationを分離した。そのため、本ADRのdirect linkに関する決定はstandalone / collection repositoryにのみ適用される。
 
-## Consequences
+## 影響
 
-- The workspace can develop a standalone Skill repository and a multi-Skill collection in the same environment.
-- Repository identity and Skill identity are separate concepts for collection repositories.
-- Claude Code and Codex continue consuming the same underlying Skill source without copies for direct-authoring repository layouts.
-- Parent validation catches name collisions across standalone and collection sources before link generation.
-- Existing local working copies under the old `skills/` placement must be moved or re-cloned under `repos/`.
-- A source repository that has neither a supported standalone nor collection layout is treated as a configuration error rather than silently ignored.
-- Pinning a reviewed shared revision for the parent workspace's own normal consumption remains a separate concern from mutable development working copies.
+- 同じworkspaceでstandalone Skill repositoryと複数Skillを持つcollection repositoryを開発できる。
+- collection repositoryではrepository identityとSkill identityを分離できる。
+- direct authoring対象では、Claude CodeとCodexがcopyではなく同じSkill sourceを参照し続ける。
+- 親validationはlink生成前にstandalone / collection source間のname collisionを検出できる。
+- 旧`skills/`配下のlocal working copyは`repos/`配下へ移動または再cloneする必要がある。
+- 対応layoutを持たないsource repositoryはsilent ignoreせずconfiguration errorとする。
+- 親ワークスペース自身が通常利用するshared Skillのversion選択は、mutableな開発working copyとは別の問題として扱う。
 
-## Alternatives
+## 検討した代替案
 
-### Collection repositories only
+### collection repositoryだけをサポートする
 
-Rejected because standalone repositories remain useful for Skills with independent lifecycle, dependencies, tests, or distribution needs.
+独立したlifecycle、dependency、test、distributionを必要とするSkillではstandalone repositoryが引き続き有用なため採用しなかった。
 
-### Keep `skills/` as the parent placement directory
+### 親配置directoryを`skills/`のままにする
 
-Rejected because the directory would contain repositories, some of which themselves contain a `skills/` collection. `repos/` makes the ownership unit explicit and avoids ambiguous paths such as `skills/agent-skills/skills/...`.
+repository自体を配置するdirectoryの中に、さらにcollection用の`skills/`が現れ、`skills/agent-skills/skills/...`のようにownership unitが分かりにくくなるため採用しなかった。`repos/`は配置単位がrepositoryであることを明確にする。
 
-### Special-case `agent-skills`
+### `agent-skills`だけをspecial caseにする
 
-Rejected because the workspace should support a repository shape, not one repository name or URL.
+特定repository名やURLではなくrepository shapeをサポートすべきであるため採用しなかった。
 
-### Convert mutable development repositories to submodules
+### mutableな開発repositoryをsubmoduleへ変換する
 
-Rejected for the same reason as ADR 0001: the parent does not need to pin mutable development working copies. A future fixed consumer copy may use a pinning mechanism independently.
+ADR 0001と同じ理由で採用しなかった。親はmutableな開発working copyのrevisionを固定する必要がない。

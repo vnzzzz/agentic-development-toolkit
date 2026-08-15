@@ -1,26 +1,26 @@
 ---
 name: replace-with-skill-name
-description: Describe exactly what this Skill does, when it should trigger, and when it should not trigger.
+description: このSkillが何を行い、どの状況でtriggerし、どの状況ではtriggerしないかを具体的に記載する。
 license: MIT
-compatibility: State required runtimes, tools, network access, and supported agents.
+compatibility: 必要なruntime、tool、network access、対応Agentを記載する。
 ---
 
-# Replace with Skill title
+# Skillタイトルを記載する
 
-## Inputs
+## 入力
 
-State required and optional inputs.
+必須inputと任意inputを記載する。
 
-## Workflow
+## 手順
 
-1. Use imperative, verifiable steps.
-2. Prefer instructions over scripts unless deterministic execution is necessary.
-3. Read only the supporting files needed for the current task.
+1. 実行内容を命令形かつ検証可能なstepで記載する。
+2. deterministicな実行が必要な場合を除き、scriptよりinstructionsを優先する。
+3. 現在のtaskに必要なsupporting fileだけを読む。
 
-## Outputs
+## 出力
 
-State the exact output contract.
+出力contractを具体的に記載する。
 
-## Safety and failure handling
+## 安全性と失敗時の扱い
 
-State trust boundaries, prohibited actions, validation, and recovery behavior.
+trust boundary、禁止操作、validation、recovery behaviorを記載する。

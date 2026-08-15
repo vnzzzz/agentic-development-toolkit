@@ -30,13 +30,9 @@ volume名、container内mount先、環境変数は秘密情報ではありませ
 
 ## Release supply chain
 
-releaseはGitHub Actionsの`GITHUB_TOKEN`でGHCRへpublishします。workflowはpublish前にexact Feature versionをGHCRへ問い合わせます。
+published exact Feature versionは、supply-chain上の識別子としてimmutableに扱います。release workflowは最小権限の`GITHUB_TOKEN`を使用し、外部Actionをfull commit SHAへ固定します。
 
-- versionが既に存在する場合はreleaseを失敗させる。
-- versionが存在しない場合だけpublishへ進む。
-- authentication、network、registry responseなどの理由で存在判定できない場合もreleaseを失敗させる。
-
-これにより、既存versionをmutable artifactとして差し替えません。release対象の変更では`src/agent-dev/devcontainer-feature.json`のSemVerを更新してください。
+version判定、失敗条件、publish手順などのrelease behaviorは[共通Dev Container Feature](docs/dev-container-feature.md#release-workflow)を正本とします。
 
 ## Authoring boundary
 

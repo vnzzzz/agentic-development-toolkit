@@ -11,14 +11,6 @@ on:
       - ".github/workflows/feature-ci.yml"
       - ".github/workflows/release-feature.yml"
   pull_request:
-    paths:
-      - "src/**"
-      - "scripts/**"
-      - "test/**"
-      - "package.json"
-      - "Makefile"
-      - ".github/workflows/feature-ci.yml"
-      - ".github/workflows/release-feature.yml"
   workflow_dispatch:
 
 permissions:

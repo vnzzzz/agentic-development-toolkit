@@ -1,33 +1,51 @@
-# Recommended GitHub repository settings
+# GitHub repository設定
 
-Workflow files cannot enforce repository-level controls. Apply settings according to repository ownership rather than assuming the parent and every child have identical checks.
+GitHub Actionsのworkflow fileだけでは、branch protectionやrepository-level security featureを強制できません。親リポジトリと各Skill source repositoryはownershipが異なるため、それぞれが実際に持つCIとsecurity featureに合わせて設定します。
 
-## Parent repository
+## 親リポジトリ
 
-- Protect `main` and require the parent `ci` checks that actually exist.
-- Block force pushes and branch deletion.
-- Enable Dependabot alerts and security updates for parent-managed dependencies.
-- Enable secret scanning and push protection where the repository plan supports them.
-- Restrict Actions to GitHub-owned actions or an explicit allowlist.
-- Require approval for first-time external contributors.
-- Set the default `GITHUB_TOKEN` permission to read-only.
+推奨設定は次のとおりです。
 
-The parent Dependabot configuration covers only parent manifests. It does not update ignored repositories under `skills/`.
+- `main`を保護し、親リポジトリで実際に存在する必須CI checkをrequired status checkに設定する。
+- force pushと保護branchの削除を禁止する。
+- 親が管理するdependencyについてDependabot alertsとsecurity updatesを有効にする。
+- 利用可能なrepository plan / security productの範囲でsecret scanningとpush protectionを有効にする。
+- GitHub Actionsで利用できるactionをGitHub-owned actionまたは明示したallowlistへ制限する。
+- 初回のexternal contributorが実行するworkflowにはapprovalを要求する。
+- `GITHUB_TOKEN`のdefault permissionはread-onlyを基本とし、write permissionが必要なworkflowだけ`permissions`で明示的に追加する。
 
-## Child Skill repositories
+親のDependabot設定は親リポジトリが管理するmanifestだけを対象とします。親Gitからignoreされる`repos/*`配下のsource repositoryは更新しません。
 
-Each child configures its own required checks, dependency updates, code scanning, release protection, and access controls. Child Dependabot must live in the child repository and cover that child's manifests.
+## Skillソースリポジトリ
 
-## GitHub Code Security checks
+各source repositoryは、自身の実装とrelease lifecycleに合わせて次を設定します。
 
-Dependency Review and CodeQL run automatically for public repositories. For a private repository with the required GitHub security product enabled, create this repository variable:
+- required status check
+- dependency update
+- code scanning
+- secret scanning / push protection
+- release protection
+- branch protection
+- collaborator access
+
+Dependabot設定も各source repository内に置き、そのrepositoryが所有するmanifestを対象にします。
+
+## GitHub Code Security関連check
+
+このリポジトリのsecurity workflowでは、利用可能なGitHub security featureに応じて一部jobを実行します。
+
+public repositoryではCode Securityの一部機能を追加契約なしで利用できます。private / internal repositoryでは、organizationのplanとGitHub Code Security / Secret Protection等の有効化状況に依存します。
+
+private repositoryでこのリポジトリのGitHub Advanced Security系checkを有効にする場合は、必要なsecurity productがrepositoryで利用可能であることを確認した上で、repository variableを設定します。
 
 ```text
 ENABLE_GHAS_CHECKS=true
 ```
 
-Without that product, those jobs are intentionally skipped for private repositories; portable parent checks continue to run.
+この条件を満たさないprivate repositoryでは対象jobをskipし、portableな親checkだけを継続して実行します。
 
-## Future pinned-child integration
+## 将来child revisionを固定する場合
 
-The parent currently uses no submodules. If a future requirement introduces pinned child commits, document and review the checkout/update workflow at that time rather than preconfiguring it now.
+現在、親リポジトリはGit submoduleを使用せず、`repos/*`のchild commitを記録しません。
+
+将来、review済みchild commitを親から再現可能に固定する要件が生じた場合は、その時点でcheckout / update方式を設計し、ADRとして記録します。現時点では将来要件のためだけにpinning mechanismを追加しません。

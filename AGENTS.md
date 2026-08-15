@@ -1,40 +1,44 @@
-# Repository instructions
+# Repository作業ルール
 
-This parent repository provides a workspace for independently managed Agent Skill source repositories used by Claude Code and Codex.
+このリポジトリを変更するAgentは、以下のrepository-local ruleに従ってください。一般的な利用方法は`README.md`、Skillソースリポジトリの運用は`docs/skill-repository-management.md`、security boundaryは`SECURITY.md`を正本とします。
 
-## Boundaries
+## 責務境界
 
-- Treat `repos/*` as ignored local source repositories; the parent tracks only `repos/README.md` and an optional `repos/.gitkeep`.
-- Support standalone repositories at `repos/<repository>/skill/SKILL.md`, collection repositories at `repos/<repository>/skills/<skill-name>/SKILL.md`, and Plugin marketplace repositories at `repos/<repository>/plugins/<plugin-name>/skills/<skill-name>/SKILL.md`.
-- Treat `.claude/skills/` and `.agents/skills/` as generated discovery links only for mutable standalone / collection authoring sources; never edit linked copies.
-- Do not expose Plugin repository Skills through generated project-local links. Plugin repositories must be validated through native Plugin tooling so namespace, packaging, cache, and bundled resource behavior are not confused with direct Skill authoring.
-- Keep source-repository discovery logic generic. Do not special-case a concrete repository in `skill_workspace.py`.
-- The workspace itself consumes the reusable public `vnzzzz/agent-skills` collection through its Codex / Claude Code Plugin package. Plugin bootstrap may name that package explicitly, but must not enumerate its individual Skills or depend on provider-internal Skill paths.
-- Do not use a git submodule or fixed shared copy for workspace consumption. The Dev Container installs the latest public Plugin after installing both agent CLIs.
-- Keep normal Plugin consumption, mutable authoring, and distribution validation as separate modes.
-- The parent owns the Dev Container, Plugin bootstrap, shared discovery tooling, standalone repository template, parent tests, documentation, and parent CI.
-- Each source repository owns its complete distributable Skill root, scripts, dependencies, fixtures, distribution-boundary tests, security review, release process, and CI.
-- For standalone Skill repositories, the complete `skill/` directory is the distributable bundle. Runtime code and references required after distribution must remain inside it; repository-only tests and fixtures stay outside it.
-- Parent CI must not clone `repos/*` or centralize child repository tests. Child Git history, branches, PRs, CI, versions, and releases remain independent.
-- Do not add credentials, host SSH mounts, Docker socket mounts, cloud credential mounts, or permissive agent flags.
-- Public GitHub Plugin installation must not require GitHub credentials; only outbound HTTPS is assumed.
-- Do not weaken validation or security checks merely to make a failing check pass.
-- Prefer the Agent Skills open format. Agent-specific metadata is allowed only as a thin distribution adapter over shared Skill content.
+- `repos/*` は独立したローカルsource repositoryとして扱い、親Gitへ追加しない。親が管理するのは`repos/README.md`と任意の`repos/.gitkeep`だけとする。
+- standalone、collection、Plugin marketplaceの各layoutは`docs/skill-repository-management.md`で定義された形を維持する。
+- `.claude/skills/`と`.agents/skills/`はstandalone / collection Skillのローカル開発用に生成される。生成リンクを直接編集しない。
+- Plugin repositoryのSkillをproject-local Skillとして直接リンクしない。Pluginとしての検証はnative Plugin toolingを使用する。
+- `skill_workspace.py`の探索処理へ特定repository名やSkill名をhard-codeしない。
+- 親ワークスペースが通常利用する共通Skillは`vnzzzz/agent-skills` Pluginから取得し、Skill本文を親リポジトリへ複製しない。
+- `repos/*`をGit submodule化しない。各source repositoryのGit履歴、PR、CI、依存関係、version、releaseはそのrepository自身が所有する。
+- 親CIから`repos/*`をcloneしてSkill固有testを中央実行しない。
+- standalone Skillでは`skill/`全体を配布バンドルとし、配布後に必要なscript、reference、assetをその外側へ依存させない。
+- credential、hostのSSH directory、Docker socket、cloud credentialをrepository設定からmountしない。Agentのpermission bypass設定を追加しない。
+- public GitHubからのPlugin導入にGitHub credentialを要求しない。
+- testやsecurity checkを通すためにvalidationを弱めない。
+- Agent Skillの共通本文はopen formatを優先し、Agent固有metadataは薄いdistribution adapterに留める。
 
-## Required checks
+## 文書変更
 
-Run before completion:
+- READMEへ詳細仕様を複製せず、詳細の正本へリンクする。
+- 設計判断はADR、日常のrepository運用は`docs/skill-repository-management.md`、security ruleは`SECURITY.md`へ置く。
+- code上のidentifier、path、command、設定値は文書の日本語化を理由に変更しない。
+- ADRの過去のdecisionは後続ADRで変更されていても書き換えず、amend関係を明示する。
+
+## 必須check
+
+変更完了前に実行する。
 
 ```bash
 make test
 make audit
 ```
 
-When changing local Skill discovery or link generation, also run:
+Skill探索またはリンク生成を変更した場合は、追加で実行する。
 
 ```bash
 make validate
 make link-skills
 ```
 
-When changing the standalone Skill template, verify that copied template repositories pass `make test`, including isolated distribution-bundle validation.
+standalone Skill templateを変更した場合は、templateから作成したrepositoryでも`make test`が成功することを確認する。

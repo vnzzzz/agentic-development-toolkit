@@ -1,3 +1,5 @@
-# Repository instructions
+# Claude Code向け補足
 
-Follow `AGENTS.md`. The canonical distributable Skill bundle is the complete `skill/` directory; do not add a repository-root `SKILL.md`. `make test` includes isolated distribution-bundle validation.
+Repository作業ルールは`AGENTS.md`を正本とし、Claude Codeでも同じルールに従います。
+
+配布対象は`skill/` directory全体です。repository直下へ`SKILL.md`を追加せず、完了前に`make test`を実行してください。

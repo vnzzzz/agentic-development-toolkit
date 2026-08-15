@@ -1,50 +1,54 @@
-# ADR 0001: Parent workspace with independent local Skill repositories
+# ADR 0001: 独立したローカルSkill repositoryを持つ親ワークスペース
 
-- Status: Accepted; amended by ADR 0002
-- Date: 2026-07-20
+- 状態: 採用。ADR 0002により一部変更
+- 日付: 2026-07-20
 
-## Context
+## 背景
 
-The development environment must support Claude Code and Codex without making either agent's discovery directory the canonical Skill source. Each Skill must also be able to gain its own Git history, CI, dependencies, fixtures, and release process.
+開発環境はClaude CodeとCodexの両方をサポートしつつ、どちらか一方のSkill探索directoryを正本にしてはならない。また、各Skillが独自のGit履歴、CI、dependency、fixture、release processを持てる必要がある。
 
-The parent repository must remain usable immediately after clone, when no child Skill repositories exist. Tracking provisional child contents in the parent would blur ownership and complicate later extraction. Requiring submodules now would add clone and update operations before the parent needs to pin child commits.
+親リポジトリは、child Skill repositoryが1件も存在しないclone直後の状態でも利用可能である必要がある。開発途中のchild contentsを親Gitで管理するとownershipが曖昧になり、後から独立repositoryへ切り出す作業も複雑になる。
 
-## Decision
+一方、親がchild commitを固定する要件はまだないため、この時点でGit submoduleを必須にするとcloneや更新の運用だけが増える。
 
-1. Use `skills/` as a local workspace for independent child repositories.
-2. Ignore `skills/*` in the parent, except `skills/README.md` and an optional `.gitkeep`.
-3. Put each child repository's distributable Skill at `skills/<repository>/skill/SKILL.md`; reject repository-root `SKILL.md` files and incomplete child layouts.
-4. Generate relative links from `.claude/skills/` and `.agents/skills/` to the same child `skill/` directory.
-5. Treat zero local Skills as a valid parent state. Validation, linking, diagnosis, tests, and CI must succeed in that state.
-6. Limit parent automation to the Dev Container, discovery tooling, templates, parent tests, documentation, and parent security settings.
-7. Keep child dependencies, tests, fixtures, demos, manifests, releases, distribution artifacts, CI, and Dependabot in each child repository.
-8. Do not use Git submodules now. Reconsider them only if the parent later needs to pin reviewed child commits reproducibly.
+## 決定
 
-ADR 0002 preserves the independent-source ownership and submodule deferral in this decision, while changing the local placement directory to `repos/` and adding collection repositories alongside standalone repositories.
+以下は本ADR採用時点の決定である。配置directoryと対応repository形式は後続のADR 0002で変更された。
 
-## Consequences
+1. 独立したchild repositoryを配置するローカルworkspaceとして`skills/`を使用する。
+2. `skills/README.md`と任意の`.gitkeep`を除き、`skills/*`を親Gitからignoreする。
+3. 各child repositoryの配布対象Skillを`skills/<repository>/skill/SKILL.md`へ置く。repository直下の`SKILL.md`と不完全なchild layoutは拒否する。
+4. `.claude/skills/`と`.agents/skills/`から同一のchild `skill/` directoryへrelative symlinkを生成する。
+5. ローカルSkillが0件の状態を正常とする。validation、link生成、diagnosis、test、CIは0件でも成功しなければならない。
+6. 親のautomationはDev Container、discovery tooling、template、親test、documentation、親security設定に限定する。
+7. child固有のdependency、test、fixture、demo、manifest、release、distribution artifact、CI、Dependabotは各child repositoryで管理する。
+8. Git submoduleは採用しない。親がreview済みchild commitを再現可能な形で固定する要件が生じた場合に再検討する。
 
-- A fresh parent clone contains no Skill implementation and still passes its checks.
-- Local child repositories can be created or cloned without changing the parent index.
-- Claude Code and Codex consume one agent-neutral Skill source without duplicated copies.
-- Parent CI uses temporary fixtures to test discovery behavior and never runs local child automation.
-- Child repositories must be initialized, committed, published, tested, and released independently.
-- The parent does not record which child commit happens to be checked out locally.
+ADR 0002は、独立したsource ownershipとsubmoduleを採用しない方針を維持したまま、ローカル配置directoryを`repos/`へ変更し、standalone repositoryに加えてcollection repositoryへ対応した。
 
-## Alternatives
+## 影響
 
-### Git submodules now
+- 親リポジトリはSkill implementationを含まないclone直後でもcheckを通せる。
+- ローカルchild repositoryを作成またはcloneしても親Git indexは変化しない。
+- Claude CodeとCodexは、複製された別々のSkillではなく同じAgent-neutralな正本を参照できる。
+- 親CIはtemporary fixtureでdiscovery behaviorを検証し、ローカルchildのautomationを実行しない。
+- child repositoryはGit初期化、commit、publish、test、releaseを独立して行う必要がある。
+- 親リポジトリはローカルでcheckoutされているchild commitを記録しない。
 
-Deferred because there is no current requirement to pin child commits and no child remote is assumed. Submodules remain an option when reproducible parent-to-child version selection becomes necessary.
+## 検討した代替案
 
-### Git subtree
+### Git submoduleを最初から使う
 
-Not selected because bidirectional history synchronization adds operational work and keeps child content in the parent history.
+現時点ではchild commitを固定する要件がなく、child remoteの存在も前提にできないため採用しなかった。親からchild versionを再現可能に選択する要件が生じた場合の選択肢として残す。
 
-### Track all Skills in the parent monorepo
+### Git subtreeを使う
 
-Not selected because it prevents a clean ownership boundary and makes later independent histories and releases harder.
+双方向のhistory synchronizationに運用負荷があり、child contentsも親historyへ残るため採用しなかった。
 
-### Duplicate Skill files in agent discovery directories
+### 全Skillを親monorepoで管理する
 
-Rejected because copies drift and can apply fixes to only one agent's version.
+ownership boundaryが不明確になり、後から独立したhistoryやreleaseへ分けにくくなるため採用しなかった。
+
+### AgentごとのSkill探索directoryへSkillを複製する
+
+copy間でdriftが発生し、一方のAgentにだけ修正が入る可能性があるため採用しなかった。

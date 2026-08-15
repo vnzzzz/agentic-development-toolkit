@@ -1,15 +1,32 @@
-# Skill repository template
+# Agent Skill repository template
 
-Rename this repository and the `name` field in `skill/SKILL.md` to the same lowercase hyphenated Skill name.
+1つのstandalone Agent Skillを独立repositoryとして開発するためのtemplateです。
 
-`skill/` is the distributable bundle. Keep repository-only tests, fixtures, CI, dependency metadata, and release tooling outside it. Do not add a repository-root `SKILL.md`.
+repository名と`skill/SKILL.md`の`name`は、同じlowercase hyphenated形式のSkill名にしてください。
 
-Run:
+## 配布境界
+
+`skill/` directory全体が配布バンドルです。
+
+Skillの実行時に必要なscript、reference、assetは`skill/`内へ置きます。test、fixture、CI、dependency metadata、release toolingなどrepositoryでのみ必要なfileは`skill/`外へ置けます。
+
+repository直下へ`SKILL.md`を追加しないでください。
+
+## 検証
+
+変更完了前に実行します。
 
 ```bash
 make test
 ```
 
-`make test` validates the Skill metadata, copies `skill/` into an isolated temporary directory, checks bundled local links and symlink boundaries, syntax-checks bundled Python / shell scripts, and then runs repository tests.
+`make test`は次を確認します。
 
-For Skills with executable scripts, add integration tests that execute the copied distributable bundle against representative fixtures. Repository tests may use fixtures outside `skill/`, but the runtime Skill must not depend on repository-only files after distribution.
+- `skill/SKILL.md`のmetadata
+- 隔離copyした`skill/`内のMarkdown local linkとsymlink boundary
+- bundled Python / shell scriptのsyntax
+- repository固有test
+
+実行可能scriptを持つSkillでは、隔離した配布バンドルを代表fixtureに対して実行するintegration testも追加してください。repository側のtestは`skill/`外のfixtureを利用できますが、配布後のSkill runtimeがrepository-only fileへ依存してはいけません。
+
+Agent向けのrepository-local ruleは`AGENTS.md`、security requirementは`SECURITY.md`を参照してください。

@@ -1,8 +1,10 @@
-# Skill repository management
+# Skillソースリポジトリの運用
 
-`repos/`は、Agent Skillのsource repositoryをローカルへ配置するdirectoryです。配下のsource repositoryは親Gitからignoreされ、submoduleとしては管理しません。
+この文書は、`repos/`配下で開発するSkillソースリポジトリの配置、ローカル開発、配布検証、Git / CI責務の正本です。
 
-## 対応するsource repository
+設計判断の背景は`docs/adr/`、security boundaryは`SECURITY.md`を参照してください。
+
+## 対応するrepository形式
 
 ### standalone repository
 
@@ -16,7 +18,7 @@ repos/<repository>/
     └── references/
 ```
 
-standalone repository名とSkillの`name`は一致させます。`skill/` directory全体が配布bundleの正本です。
+repository directory名とSkillの`name`を一致させます。`skill/` directory全体が配布バンドルの正本です。
 
 ### collection repository
 
@@ -31,11 +33,11 @@ repos/<repository>/
         └── SKILL.md
 ```
 
-各`skills/<skill-name>` directory名とそのSkillの`name`は一致させます。collection repository名自体はSkill名と一致する必要はありません。
+各`skills/<skill-name>` directory名とSkillの`name`を一致させます。repository名自体はSkill名と一致する必要はありません。
 
 ### Plugin marketplace repository
 
-1 repositoryが一つ以上のPlugin packageを持ち、Plugin配下にSkill collectionを持つ形式です。
+1 repositoryが1つ以上のPlugin packageを持ち、そのPlugin配下にSkill collectionを持つ形式です。
 
 ```text
 repos/<repository>/
@@ -48,126 +50,162 @@ repos/<repository>/
                 └── SKILL.md
 ```
 
-Skillを持たないPlugin directoryは探索対象外です。少なくとも一つの`plugins/<plugin-name>/skills/`が必要です。
-各Skill directory名とSkillの`name`は一致させます。
+Skillを持たないPlugin directoryは探索対象外です。`plugins/`配下には少なくとも1つの`plugins/<plugin-name>/skills/`が必要です。各Skill directory名とSkillの`name`を一致させます。
 
-repository直下の`SKILL.md`はサポートしません。`skill/`、`skills/`、`plugins/`を同一repositoryで混在させるlayoutや、Skill directoryに`SKILL.md`がない不完全layoutはconfiguration errorです。
+### 不正なlayout
 
-## Authoring mode
+次はconfiguration errorとして扱います。
 
-standalone / collection repositoryは、次を実行するとworking treeのSkill rootがClaude Code / Codex双方へ直接linkされます。
+- repository直下の`SKILL.md`
+- 同一repositoryで`skill/`、`skills/`、`plugins/`を混在させるlayout
+- Skill directoryに`SKILL.md`が存在しない不完全layout
+- 複数のlocal source repository / Pluginで同じSkill名を定義する構成
+
+## 利用モード
+
+### 通常のPlugin利用
+
+親ワークスペース自身が利用する共通Skillは、public `vnzzzz/agent-skills` Pluginから導入します。
+
+この通常利用copyと、`repos/`配下のmutableな開発working copyは別のものとして扱います。親ワークスペースへSkill本文を複製したり、`repos/agent-skills`を通常利用copyとして流用したりしません。
+
+### ローカル開発
+
+standalone / collection repositoryでは、次を実行してworking treeのSkill rootをClaude Code / Codexの双方へ直接公開します。
 
 ```bash
 make validate
 make link-skills
 ```
 
-- standalone: `.claude/skills/<name>` / `.agents/skills/<name>` → `repos/<repository>/skill`
-- collection: `.claude/skills/<name>` / `.agents/skills/<name>` → `repos/<repository>/skills/<name>`
+生成されるlinkは次のとおりです。
 
-このlinkはmutable authoring用です。Skill root内の`scripts/`、`references/`、assets等もworking treeからそのまま利用できます。
+```text
+standalone
+.claude/skills/<name> -> repos/<repository>/skill
+.agents/skills/<name> -> repos/<repository>/skill
 
-Plugin repositoryのSkillはproject-local Skillへdirect linkしません。Pluginとしてのnamespace、packaging、cache、bundled resource resolutionを保った状態で検証するため、native Plugin toolingを使います。
+collection
+.claude/skills/<name> -> repos/<repository>/skills/<name>
+.agents/skills/<name> -> repos/<repository>/skills/<name>
+```
 
-## Distribution validation
+Skill root内の`scripts/`、`references/`、assetもworking treeから直接利用されます。この経路は編集内容をすぐAgentへ反映するためのものであり、配布packageの検証ではありません。
 
-各source repositoryは自身の配布境界をCIで検証します。parent workspaceはchild repositoryのruntime testを中央実行しません。
+Plugin repositoryのSkillは`.claude/skills/` / `.agents/skills/`へ直接linkしません。Plugin namespace、packaging、cache、bundled resource resolutionを含めて確認するため、native Plugin toolingを使用します。
 
-standalone templateでは次を実行します。
+### 配布検証
+
+各source repositoryは、自身が実際に配布するfile setだけで成立することを自身のCIで検証します。親ワークスペースはchild repository固有のruntime testを中央実行しません。
+
+standalone Skill templateでは次を実行します。
 
 ```bash
 cd repos/<skill-name>
 make test
 ```
 
-`make test`は次を含みます。
+`make test`には少なくとも次が含まれます。
 
-- `skill/SKILL.md` metadata validation
-- `skill/`を一時directoryへ隔離copy
-- bundle内local Markdown linkが`skill/`外へ逃げないこと
-- symlinkが配布Skill root外へescapeしないこと
+- `skill/SKILL.md`のmetadata validation
+- `skill/`をtemporary directoryへ隔離copyしたdistribution-boundary validation
+- bundle内の全Markdown documentについて、local linkがSkill root内に留まりtargetが存在することの確認
+- symlinkがSkill root外へescapeせず、targetが存在することの確認
 - bundled Python / shell scriptのsyntax check
-- repository固有unit / integration test
+- repository固有のunit / integration test
 
-scriptの実挙動まではgeneric validatorだけでは保証できません。実行可能scriptを持つSkill repositoryでは、隔離された配布bundleを使って代表fixtureを処理するintegration testを追加します。testsやfixture自体はrepository側に置けますが、配布後のruntimeがrepository-only fileへ依存してはいけません。
+Generic validatorはSkill固有のruntime behaviorまで保証しません。実行可能scriptを持つSkill repositoryでは、隔離した配布バンドルを代表fixtureに対して実行するintegration testを追加します。
 
-collection / Plugin repositoryは各providerのlayoutとrelease方式に合わせて同等のdistribution-boundary testを所有します。
+Testやfixture自体はrepository側に置けますが、配布後のruntimeがrepository-only fileへ依存してはなりません。
 
-## standalone repositoryを作成する
+collection / Plugin repositoryは、それぞれのproviderがlayoutとrelease方式に合わせた同等のdistribution-boundary testを所有します。
+
+## source repositoryを追加する
+
+### standalone repositoryをtemplateから作成する
+
+親ワークスペースrootで実行します。
 
 ```bash
 cp -R templates/skill-repository repos/<skill-name>
-# repos/<skill-name>/skill/SKILL.mdを編集
+# repos/<skill-name>/skill/SKILL.mdを編集する
 make validate
 make link-skills
 cd repos/<skill-name>
 make test
 ```
 
-repositoryを個別管理する準備ができた段階で、そのdirectory内でGitを初期化・publishします。親workspaceはremote URLを仮定しません。
+Skill repositoryを個別管理する準備ができたら、そのdirectory内でGitを初期化してpublishします。親ワークスペースはremote URLを仮定しません。
 
-## 既存repositoryをcloneする
+### 既存repositoryをcloneする
 
-実在するrepository URLを`repos/<repository>`へcloneし、次を実行します。
+実在するrepository URLを`repos/<repository>`へcloneし、親ワークスペースrootで実行します。
 
 ```bash
 make validate
 make link-skills
 ```
 
-standalone / collection repositoryでは`.claude/skills/<name>`と`.agents/skills/<name>`が実際のSkill rootへ直接linkされます。同名Skillが複数source repositoryやPluginから見つかった場合はvalidationで失敗します。
+standalone / collection repositoryはdirect authoring linkが生成されます。Plugin repositoryは探索・validation対象ですが、個別Skill linkは生成されません。
 
-Plugin repositoryは探索・validation対象ですが、個別Skill linkを作りません。provider repositoryのnative Plugin validationを利用します。
+## Plugin providerのlocal検証
 
-### `agent-skills` providerをlocal検証する
+`agent-skills` providerをlocal working copyから検証する場合の例を示します。
 
-Codex側でlocal marketplaceを使う場合:
+### Codex
+
+local marketplace sourceへ明示的に切り替えます。
 
 ```bash
 AGENT_SKILLS_MARKETPLACE_SOURCE="$PWD/repos/agent-skills" \
   bash scripts/install-agent-skills-plugin.sh
 ```
 
-このbootstrapはinstalled Pluginとmarketplace sourceをfreshに置き換えるため、public Pluginとlocal Pluginを曖昧に併存させません。検証後は環境変数なしで再実行してpublic default sourceへ戻します。
+bootstrapは同じmarketplace名の既存sourceを置き換えて再導入します。検証後は環境変数を付けずに再実行し、public default sourceへ戻します。
 
-Claude Code側ではPlugin rootを直接読み込めます。
+```bash
+bash scripts/install-agent-skills-plugin.sh
+```
+
+### Claude Code
+
+Plugin rootをworking copyから直接読み込みます。
 
 ```bash
 claude --plugin-dir "$PWD/repos/agent-skills/plugins/agent-skills"
 ```
 
-`--plugin-dir`はlocal Plugin working copyをsession単位で読み込むため、individual Skillをproject-local linkへ展開せずPlugin namespaceのまま確認できます。
+この経路ではindividual Skillをproject-local linkへ展開せず、Plugin namespaceを保ったままsession単位で確認できます。
 
-## Parent Git boundary
+## 親Gitとの境界
 
-親をcommitする前に、indexを変更しないdry-runで確認します。
+`repos/*`は親Gitからignoreします。各source repositoryは独立したGit repositoryとして管理し、親へsubmoduleとして登録しません。
+
+親をcommitする前に、indexを変更しないdry-runで境界を確認できます。
 
 ```bash
 git check-ignore -v repos/<repository>/skill/SKILL.md
 git add -n .
 ```
 
-collection / Plugin marketplace repositoryの場合も`repos/<repository>/`全体がignore対象です。dry-runにsource repositoryやgenerated discovery linkが含まれてはいけません。
+collection / Plugin repositoryでも`repos/<repository>/`全体がignore対象です。`git add -n .`へsource repositoryや`.claude/skills/`、`.agents/skills/`の生成linkが含まれてはいけません。
 
-各`repos/<repository>`は独立Git repositoryとしてbranch、commit、PR、CI、version、releaseを管理します。親workspaceはchild commitを記録せず、submoduleにも変換しません。
+## Git / CIの責務
 
-## Source repository responsibilities
+| 対象 | 所有するもの |
+|---|---|
+| 親ワークスペース | Dev Container、Agent CLI bootstrap、generic discovery / validation / link tooling、standalone template、親test、親security設定、shared Plugin integration |
+| Skill source repository | Skill本体、runtime resource、dependency、test、fixture、distribution-boundary test、security update、CI、version、release |
+| Plugin provider repository | 上記に加えてPlugin metadata、Plugin packaging、native Plugin loading / distribution validation |
 
-各source repositoryは次を所有します。
+各`repos/<repository>`は、自身のbranch、commit、PR、CI、version、releaseを独立して管理します。親リポジトリはlocal child commit SHAを記録しません。
 
-- Skillの`SKILL.md`とbundled runtime resources
-- Skill固有scriptsとdependencies
-- tests、fixtures、demos
-- distribution-boundary testとruntime integration test
-- security reviewとdependency updates
-- Plugin metadataを含むmanifest、versioning、releases、distribution
-- GitHub ActionsとDependabot設定
+親CIが成功しても、ローカルにcloneされているすべてのSkillのruntime test成功を意味しません。各source repositoryのPRが自身のruntimeと配布境界を検証します。
 
-親workspaceはSkill metadataの探索・横断validation・standalone / collection authoring link生成と、workspace自身が利用するshared Plugin integration testを行います。source repository固有dependencyのinstallやSkill固有testは自動実行しません。
+## 関連文書
 
-## shared Pluginとの関係
-
-`repos/`はmutableな開発用working copyの置き場です。
-親workspace自身が通常利用するshared Skillは`vnzzzz/agent-skills` Pluginとして別に導入し、`repos/`のcloneを通常利用copyとして流用しません。
-
-shared Pluginは特定revisionへpinせず、Dev Container作成時にpublic marketplaceから最新を導入します。Plugin providerのlocal working copyを検証するときだけnative local Plugin経路へ明示的に切り替えます。
+- `docs/adr/0001-polyrepo-workspace.md`: polyrepo workspaceを採用した理由
+- `docs/adr/0002-skill-collection-repositories.md`: standalone / collection対応
+- `docs/adr/0003-authoring-and-distribution-validation.md`: direct authoringとdistribution validationの分離
+- `SECURITY.md`: trust modelとsecurity boundary
+- `docs/github-repository-settings.md`: GitHub repository-level settings

@@ -1,74 +1,74 @@
-# ADR 0003: Separate mutable Skill authoring from distribution validation
+# ADR 0003: mutableなSkill開発と配布検証を分離する
 
-- Status: Accepted
-- Date: 2026-08-15
+- 状態: 採用
+- 日付: 2026-08-15
 
-## Context
+## 背景
 
-The workspace now handles three different concerns that look similar on disk but have different correctness requirements:
+このワークスペースでは、disk上では似て見えるが正しさの条件が異なる3つの用途を扱う。
 
-1. the workspace normally consumes shared reusable Skills from the public `vnzzzz/agent-skills` Plugin;
-2. standalone and collection Skill repositories under `repos/` need a short feedback loop while their working trees are being edited;
-3. Plugin repositories and script-bearing Skills must also prove that the actual distributable package works without relying on repository-only files or project-local discovery behavior.
+1. 親ワークスペース自身が、public `vnzzzz/agent-skills` Pluginから共有Skillを通常利用する。
+2. `repos/`配下のstandalone / collection Skill repositoryを編集するとき、working treeを短いfeedback loopでAgentへ反映する。
+3. Plugin repositoryやscriptを含むSkillについて、repository-only fileやproject-localな探索挙動へ依存せず、実際の配布packageとして成立することを確認する。
 
-Direct links from `.claude/skills/` and `.agents/skills/` to a mutable Skill root are useful for authoring because edits become visible without copying or packaging. They do not prove that a Plugin namespace, Plugin cache, packaged file set, or bundled resource resolution will behave the same way after distribution.
+`.claude/skills/`と`.agents/skills/`からmutableなSkill rootへ直接リンクする方法は、copyやpackagingなしで変更を反映できるため開発に適している。一方、この方法ではPlugin namespace、Plugin cache、配布file set、bundled resource resolutionが配布後と同じになることを証明できない。
 
-This distinction matters more for Skills that contain scripts, references, or assets. A Skill can work from a repository checkout while accidentally reading tests, fixtures, generated files, or sibling directories that are absent from the distributed Skill bundle.
+script、reference、assetを含むSkillではこの差が重要になる。repository checkout上では動作していても、配布物に含まれないtest、fixture、generated file、sibling directoryへ誤って依存する可能性がある。
 
-Plugin repositories add another ambiguity. Exposing each Plugin Skill as a project-local direct link while an installed Plugin with the same capability is also present can make it unclear which source is active. It also removes Plugin namespacing from the authoring path.
+Plugin repositoryではさらに、同等のinstalled Pluginが存在する状態で個別Skillもproject-local linkとして公開すると、どのsourceが有効か分かりにくくなる。また、project-local Skillとして読む経路ではPlugin namespaceが失われる。
 
-## Decision
+## 決定
 
-1. Keep three explicit modes:
-   - normal Plugin consumption;
-   - mutable direct authoring;
-   - distribution validation.
-2. Normal workspace consumption continues to install the public `vnzzzz/agent-skills` Plugin during Dev Container creation.
-3. Direct authoring links are generated only for standalone and collection repositories:
-   - `repos/<repository>/skill/<...>`;
-   - `repos/<repository>/skills/<skill-name>/<...>`.
-4. Plugin repository Skills remain discoverable and validated for metadata, layout, duplicate names, and Skill-root security boundaries, but are not linked into `.claude/skills/` or `.agents/skills/`.
-5. Plugin repositories are tested through native Plugin mechanisms owned by the provider repository. For the shared `agent-skills` provider:
-   - Claude Code may load the Plugin working tree with `--plugin-dir`;
-   - Codex may switch the existing marketplace installation to a local marketplace source through the workspace bootstrap and then restore the public source.
-6. The standalone repository template treats the complete `skill/` directory as the distributable bundle.
-7. Template `make test` must validate an isolated copy of `skill/` before repository unit tests:
-   - local Markdown links must remain inside the bundle and exist;
-   - symlinks must not escape the Skill root;
-   - bundled Python and shell scripts receive syntax checks from the isolated copy.
-8. Generic distribution validation does not pretend to prove Skill-specific runtime behavior. Script-bearing Skill repositories must add representative integration tests that execute the distributed bundle against repository-owned fixtures.
-9. Parent CI continues to validate only workspace infrastructure, generic discovery/link behavior, the standalone template, and shared Plugin integration. It must not clone or execute every child repository.
-10. Each child repository remains an independent Git repository and owns its branches, commits, PRs, dependencies, tests, CI, security updates, versions, releases, and distribution artifacts.
-11. `repos/*` remains ignored by the parent Git repository and is not converted to submodules.
+1. 次の3 modeを明確に分離する。
+   - 通常のPlugin利用
+   - mutableなdirect authoring
+   - distribution validation
+2. 親ワークスペースの通常利用では、Dev Container作成時にpublic `vnzzzz/agent-skills` Pluginを導入する。
+3. direct authoring linkはstandalone / collection repositoryにだけ生成する。
+   - `repos/<repository>/skill/<...>`
+   - `repos/<repository>/skills/<skill-name>/<...>`
+4. Plugin repositoryのSkillはmetadata、layout、duplicate name、Skill root security boundaryの探索・validation対象には含めるが、`.claude/skills/`や`.agents/skills/`へlinkしない。
+5. Plugin repositoryの配布検証はprovider repositoryが所有するnative Plugin mechanismで行う。共有`agent-skills` providerでは次を利用できる。
+   - Claude Code: Plugin working treeを`--plugin-dir`で読み込む。
+   - Codex: workspace bootstrapを使って既存marketplace installationをlocal marketplace sourceへ切り替え、検証後にpublic sourceへ戻す。
+6. standalone repository templateでは`skill/` directory全体を配布バンドルの正本とする。
+7. templateの`make test`はrepository unit testより前に、隔離copyした`skill/`を検証する。
+   - local Markdown linkがbundle内に留まり、targetが存在すること。
+   - symlinkがSkill root外へescapeしないこと。
+   - bundled Python / shell scriptのsyntaxが正しいこと。
+8. genericなdistribution validationだけでSkill固有runtime behaviorを保証したことにはしない。実行可能scriptを持つSkill repositoryは、配布bundleを代表fixtureに対して実行するintegration testを追加する。
+9. 親CIはworkspace infrastructure、genericなdiscovery / link behavior、standalone template、shared Plugin integrationだけを検証する。すべてのchild repositoryをcloneして実行してはならない。
+10. 各child repositoryは独立したGit repositoryとして、branch、commit、PR、dependency、test、CI、security update、version、release、distribution artifactを所有する。
+11. `repos/*`は引き続き親Gitからignoreし、Git submoduleへ変換しない。
 
-## Consequences
+## 影響
 
-- Standalone and collection Skills retain immediate working-tree feedback for Claude Code and Codex.
-- Plugin working copies no longer create project-local Skill entries that can overlap ambiguously with installed Plugin capabilities.
-- Native Plugin testing preserves the runtime properties that direct Skill links cannot model.
-- Script-bearing standalone Skills gain a reusable distribution-boundary check without moving their tests or dependencies into the parent workspace.
-- A passing parent CI does not imply that every local child Skill passes its own runtime tests; that remains intentionally delegated to each source repository.
-- Child CI failures remain isolated from parent workspace infrastructure failures.
-- The parent does not record local child revisions, so reproducibility of a child release is established by the child repository itself rather than by the parent workspace checkout.
+- standalone / collection SkillはClaude CodeとCodexに対する即時のworking-tree feedbackを維持できる。
+- Plugin working copyがinstalled Pluginと重複するunnamespacedなproject-local Skill entryを作らなくなる。
+- native Plugin testingによって、direct Skill linkでは再現できないPlugin runtimeの性質を検証できる。
+- scriptを含むstandalone Skillは、testやdependencyを親workspaceへ移さずに共通のdistribution-boundary checkを利用できる。
+- 親CIが成功しても、ローカルに存在するすべてのchild Skillのruntime test成功を意味しない。これは各source repositoryへ意図的に委譲する。
+- child CIのfailureと親workspace infrastructureのfailureを分離できる。
+- 親はlocal child revisionを記録しないため、child releaseの再現性は親checkoutではなくchild repository自身が担保する。
 
-## Alternatives
+## 検討した代替案
 
-### Install every mutable Skill as a Plugin during editing
+### 編集中のすべてのSkillをPluginとしてinstallする
 
-Rejected because standalone Skills do not require Plugin packaging and reinstalling on each edit creates a slower feedback loop than direct working-tree authoring.
+standalone SkillにはPlugin packagingが必須ではなく、編集のたびにreinstallするとdirect working-tree authoringよりfeedback loopが遅くなるため採用しなかった。
 
-### Direct-link Plugin Skills and also run Plugin validation later
+### Plugin Skillをdirect linkし、別途Plugin validationも行う
 
-Rejected as the default because it leaves an installed Plugin and unnamespaced project-local copies visible at the same time and makes source selection harder to reason about.
+installed Pluginとunnamespacedなproject-local copyが同時に見える状態を残し、source selectionを判断しにくくするためdefaultには採用しなかった。
 
-### Run all child CI from the parent workspace
+### すべてのchild CIを親workspaceから実行する
 
-Rejected because the parent does not own child dependencies, fixtures, runtime versions, or release lifecycles. Central execution would couple unrelated repositories and make parent CI depend on local source availability.
+親はchild固有のdependency、fixture、runtime version、release lifecycleを所有しない。中央実行すると無関係なrepositoryを結合し、親CIがlocal source availabilityへ依存するため採用しなかった。
 
-### Convert `repos/*` to Git submodules
+### `repos/*`をGit submoduleへ変換する
 
-Rejected because mutable development working copies do not need a parent-owned revision pin. Each child repository already provides the Git history needed to reproduce its own releases.
+mutableな開発working copyに親所有のrevision pinは不要であり、各child repository自身がrelease再現に必要なGit historyを持つため採用しなかった。
 
-### Put tests and fixtures inside the distributable Skill bundle
+### testとfixtureを配布Skill bundle内へ置く
 
-Rejected as a generic requirement. Tests and fixtures are development assets unless the Skill actually needs them at runtime. Distribution validation should instead prove that runtime files remain inside the bundle while repository-only validation assets stay outside it.
+testやfixtureは、Skill runtimeで実際に必要な場合を除きdevelopment assetである。genericな要件としてbundle内へ含めるのではなく、runtime fileがbundle内で完結することをdistribution validationで確認する方針とした。

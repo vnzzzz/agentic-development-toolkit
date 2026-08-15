@@ -1,6 +1,6 @@
 # ADR 0002: Support standalone and collection Skill source repositories
 
-- Status: Accepted
+- Status: Accepted; amended by ADR 0003
 - Date: 2026-08-14
 
 ## Context
@@ -26,11 +26,13 @@ Replacing the standalone model with a collection-only model would discard useful
 9. Keep parent automation limited to discovery, cross-repository validation, link generation, the Dev Container, parent tests, documentation, and parent security controls.
 10. Do not hard-code `agent-skills`; collection support is a generic repository capability.
 
+ADR 0003 extends the workspace to Plugin marketplace repositories and separates direct Skill authoring from native Plugin distribution validation. The direct-link decision above continues to apply to standalone and collection repositories, not Plugin repository Skills.
+
 ## Consequences
 
 - The workspace can develop a standalone Skill repository and a multi-Skill collection in the same environment.
 - Repository identity and Skill identity are separate concepts for collection repositories.
-- Claude Code and Codex continue consuming the same underlying Skill source without copies.
+- Claude Code and Codex continue consuming the same underlying Skill source without copies for direct-authoring repository layouts.
 - Parent validation catches name collisions across standalone and collection sources before link generation.
 - Existing local working copies under the old `skills/` placement must be moved or re-cloned under `repos/`.
 - A source repository that has neither a supported standalone nor collection layout is treated as a configuration error rather than silently ignored.

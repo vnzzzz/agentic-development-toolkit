@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 CLAUDE_CODE_VERSION=${CLAUDECODEVERSION:?claudeCodeVersion is required}
 CODEX_VERSION=${CODEXVERSION:?codexVersion is required}
 
@@ -54,7 +55,7 @@ install -d -m 0700 \
 chown -R "$remote_user:$remote_group" /var/lib/agentic-dev
 
 install -d -m 0755 /usr/local/share/agentic-dev
-install -m 0755 post-create.sh /usr/local/share/agentic-dev/post-create.sh
+install -m 0755 "$SCRIPT_DIR/post-create.sh" /usr/local/share/agentic-dev/post-create.sh
 
 claude --version
 codex --version

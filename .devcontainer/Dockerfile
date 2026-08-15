@@ -30,7 +30,13 @@ ENV PATH=/opt/venv/bin:${PATH}
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
-RUN mkdir -p /home/vscode/.claude /home/vscode/.codex \
-    && chown -R vscode:vscode /home/vscode/.claude /home/vscode/.codex
+RUN mkdir -p \
+        /home/vscode/.claude \
+        /home/vscode/.codex \
+        /home/vscode/.config/gh \
+    && chown -R vscode:vscode \
+        /home/vscode/.claude \
+        /home/vscode/.codex \
+        /home/vscode/.config
 
 USER vscode

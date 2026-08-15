@@ -11,9 +11,10 @@ Skillを利用する前に、そのsource repositoryが配布する`SKILL.md`と
 親リポジトリは次を管理します。
 
 - Dev Containerはnon-rootの`vscode` userで実行する。
-- Claude CodeとCodexの認証情報は別々のnamed volumeへ保存する。
+- Claude Code、Codex、GitHub CLIの認証情報は相互に分離したnamed volumeへ保存する。
 - repository設定からhost credential directoryやDocker socketをmountしない。
 - Agent CLIのversionは`package.json`で固定する。
+- GitHub CLIは公式Dev Container Feature `ghcr.io/devcontainers/features/github-cli:1`から導入する。
 - Dev Container起動時にGit初期化、submodule更新、source repository固有dependencyの導入、source repository固有testの実行を行わない。
 - post-create時のローカルSkill link生成はbest-effortとし、不正なローカルsourceが親環境そのものの利用を妨げないようにする。
 - 親CIは親のcode、shell script、configuration、template、security設定を検証し、`repos/*`のSkill固有runtimeを中央実行しない。

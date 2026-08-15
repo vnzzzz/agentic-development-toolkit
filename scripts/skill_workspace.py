@@ -320,7 +320,7 @@ def command_link() -> int:
 def command_doctor() -> int:
     print(f"workspace: {ROOT}")
     print(f"python: {sys.version.split()[0]}")
-    for executable in ("git", "make", "claude", "codex"):
+    for executable in ("git", "gh", "make", "claude", "codex"):
         path = shutil.which(executable)
         if not path:
             print(f"{executable}: not found")

@@ -9,11 +9,11 @@ Claude CodeとCodexの両方でAgent Skillを開発するためのワークス�
 推奨する利用方法はDev Containerです。
 
 1. VS Codeで **Dev Containers: Reopen in Container** を実行する。
-2. 必要に応じてClaude CodeとCodexでAgent認証を行う。
-3. `make doctor` で環境とローカルSkillの状態を確認する。
+2. 必要に応じてClaude Code、Codex、GitHub CLIで認証を行う。
+3. `make doctor` で開発toolとローカルSkillの状態を確認する。
 4. `make test` で親ワークスペースを検証する。
 
-Dev Containerを使わない場合は、`make bootstrap` で親ワークスペース用のローカル環境とSkill探索リンクを準備できます。Agent CLI、共有Plugin、各Skill固有の依存関係は導入しません。
+Dev Containerを使わない場合は、`make bootstrap` で親ワークスペース用のローカル環境とSkill探索リンクを準備できます。Agent CLI、GitHub CLI、共有Plugin、各Skill固有の依存関係は導入しません。
 
 ## 3つの利用モード
 
@@ -48,7 +48,7 @@ repos/<repository>/plugins/<plugin-name>/skills/<skill-name>/SKILL.md
 |---|---|
 | `make validate` | ローカルSkillの配置、frontmatter、Skill root境界を検証する |
 | `make link-skills` | standalone / collection Skillの開発用リンクを同期する |
-| `make doctor` | Agent CLIとローカルSkillの状態を表示する |
+| `make doctor` | Agent CLI、GitHub CLI、ローカルSkillの状態を表示する |
 | `make test` | 親ワークスペースのtestとsecurity auditを実行する |
 | `make audit` | 親ワークスペースのsecurity設定を監査する |
 | `make bootstrap` | Dev Containerを使わない場合の親ローカル環境を準備する |
@@ -59,7 +59,7 @@ Skill固有のtestや依存関係の導入は、各source repository側で実行
 
 - [Skillソースリポジトリの運用](docs/skill-repository-management.md): repository layout、ローカル開発、配布検証、Git / CI責務
 - [GitHub repository設定](docs/github-repository-settings.md): branch protectionやGitHub security設定
-- [Security policy](SECURITY.md): trust modelとsecurity boundary
+- [セキュリティポリシー](SECURITY.md): trust modelとsecurity boundary
 - [ADR 0001](docs/adr/0001-polyrepo-workspace.md): 独立したSkill repositoryを扱うpolyrepo workspaceの採用
 - [ADR 0002](docs/adr/0002-skill-collection-repositories.md): standalone / collection repository対応
 - [ADR 0003](docs/adr/0003-authoring-and-distribution-validation.md): ローカル開発と配布検証の分離

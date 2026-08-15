@@ -5,6 +5,7 @@
     "context": ".."
   },
   "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/node:1": {
       "version": "22",
       "installYarnUsingApt": false
@@ -13,7 +14,8 @@
   "remoteUser": "vscode",
   "mounts": [
     "source=agent-skill-claude-${devcontainerId},target=/home/vscode/.claude,type=volume",
-    "source=agent-skill-codex-${devcontainerId},target=/home/vscode/.codex,type=volume"
+    "source=agent-skill-codex-${devcontainerId},target=/home/vscode/.codex,type=volume",
+    "source=agent-skill-gh-${devcontainerId},target=/home/vscode/.config/gh,type=volume"
   ],
   "containerEnv": {
     "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",

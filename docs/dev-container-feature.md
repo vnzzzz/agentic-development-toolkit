@@ -47,22 +47,9 @@ consumer repositoryは自身をVS Code workspace / Git rootとして直接開き
 
 `agent-dev:1`のようにmajor versionを指定しても、lockfileが実際に解決したFeature versionとdigestを固定します。GHCR側の`1` tagが更新されても、lockfileを更新するまで既存projectのbuildは同じartifactを利用します。
 
-## Security constraints
+## Security
 
-- Feature sourceやGHCR artifactへcredential、token、認証済みconfigを含めない。
-- hostのcredential directory、SSH directory、Docker socketをbind mountしない。
-- 認証済みcontainerはtrusted repositoryでのみ利用する。
-- 未確認のscriptやdependencyをcredential access可能な状態で実行しない。
-
-Featureは次のnamed volumeをmountします。
-
-- Claude Code: `agentic-dev-claude-${devcontainerId}`
-- Codex: `agentic-dev-codex-${devcontainerId}`
-- GitHub CLI: `agentic-dev-gh-${devcontainerId}`
-
-`${devcontainerId}`はDev Containerごとに分かれ、rebuild間では安定します。volume名やmount先は公開情報であり、credentialそのものではありません。
-
-詳細なtrust boundaryは[セキュリティポリシー](../SECURITY.md)を参照してください。
+credential、named volume、host mount、trusted repositoryに関する要件とtrust boundaryは[SECURITY.md](../SECURITY.md)を正本とします。`agent-dev`を利用する前に同文書を確認してください。
 
 ## Versioning
 

@@ -39,11 +39,13 @@ def workflow_files() -> list[Path]:
     )
 
 
-def mount_source(mount: str) -> str:
+def parse_mount(mount: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
     for item in mount.split(","):
-        if item.startswith("source="):
-            return item.removeprefix("source=")
-    return ""
+        key, separator, value = item.partition("=")
+        if separator:
+            fields[key] = value
+    return fields
 
 
 def audit_devcontainer(findings: list[str]) -> None:
@@ -54,6 +56,10 @@ def audit_devcontainer(findings: list[str]) -> None:
 
     if config.get("remoteUser") in {None, "root"}:
         findings.append(f"{relative}: must explicitly run as a non-root user")
+
+    features = config.get("features", {})
+    if "ghcr.io/devcontainers/features/github-cli:1" not in features:
+        findings.append(f"{relative}: must install GitHub CLI through the official Dev Container Feature")
 
     serialized = json.dumps(config)
     for forbidden in (
@@ -74,15 +80,27 @@ def audit_devcontainer(findings: list[str]) -> None:
             f"{relative}: host-side initializeCommand is not allowed; startup must not depend on Git state"
         )
 
-    mounts = config.get("mounts", [])
-    claude_mounts = [mount for mount in mounts if "target=/home/vscode/.claude" in mount]
-    codex_mounts = [mount for mount in mounts if "target=/home/vscode/.codex" in mount]
-    if len(claude_mounts) != 1:
-        findings.append(f"{relative}: must define one isolated Claude authentication volume")
-    if len(codex_mounts) != 1:
-        findings.append(f"{relative}: must define one isolated Codex authentication volume")
-    if claude_mounts and codex_mounts and mount_source(claude_mounts[0]) == mount_source(codex_mounts[0]):
-        findings.append(f"{relative}: Claude and Codex authentication must use different volumes")
+    mounts = [parse_mount(mount) for mount in config.get("mounts", [])]
+    auth_mount_specs = (
+        ("Claude", "/home/vscode/.claude"),
+        ("Codex", "/home/vscode/.codex"),
+        ("GitHub CLI", "/home/vscode/.config/gh"),
+    )
+    auth_sources: list[str] = []
+    for label, target in auth_mount_specs:
+        matching = [mount for mount in mounts if mount.get("target") == target]
+        if len(matching) != 1:
+            findings.append(f"{relative}: must define one isolated {label} authentication volume")
+            continue
+        mount = matching[0]
+        source = mount.get("source", "")
+        if mount.get("type") != "volume" or not source:
+            findings.append(f"{relative}: {label} authentication must use a named volume")
+            continue
+        auth_sources.append(source)
+
+    if len(auth_sources) == len(auth_mount_specs) and len(set(auth_sources)) != len(auth_sources):
+        findings.append(f"{relative}: Agent and GitHub CLI authentication volumes must be isolated")
 
     if "COPY repos" in dockerfile or "pip install" in dockerfile:
         findings.append(

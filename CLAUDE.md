@@ -1,21 +1,16 @@
-# Repository instructions
+# Claude Code向け補足
 
-This parent workspace develops portable Agent Skills and exposes local child repositories to both Claude Code and Codex.
+Repository全体の作業ルールは`AGENTS.md`を正本とします。Claude Code固有の例外はありません。
 
-- `skills/*` contains ignored local child repositories; the parent tracks only the directory documentation.
-- A child Skill's canonical distributable source is `skills/<repository>/skill/`.
-- `.claude/skills/` and `.agents/skills/` contain generated symlinks only.
-- Keep parent workspace logic generic. Child tests, dependencies, fixtures, CI, manifests, and releases remain in the child repository.
-- Parent tests and CI must pass when no local Skills are present.
-- Preserve non-root execution and isolated authentication volumes in the Dev Container.
-- Do not use permission-bypass flags, mount host credential directories, or mount the Docker socket.
-- Do not commit local Skill directories, generated links, local agent state, API keys, tokens, or build output.
+## Workflow
 
-Before completion run:
+- Feature sourceは`src/agent-dev/`、実container testは`test/agent-dev/`を変更する。
+- consumer repositoryやAgent Skill sourceをこのrepository配下へcloneして管理しない。
+- release対象の変更ではFeature versionを更新する。
+- 完了前のcheckは`AGENTS.md`に従う。
 
-```bash
-make test
-make audit
-```
+## Supporting documents
 
-When changing Skill discovery or links, also run `make validate` and `make link-skills`.
+- [AGENTS.md](AGENTS.md)
+- [docs/dev-container-feature.md](docs/dev-container-feature.md)
+- [SECURITY.md](SECURITY.md)

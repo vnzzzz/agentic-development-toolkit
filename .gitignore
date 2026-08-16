@@ -1,27 +1,9 @@
 .DS_Store
-.venv/
 .vscode/
-build/
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
 
-# Local agent state and credentials
-.claude/settings.local.json
+# Local agent state
+.claude/
 .codex/
-!.codex/config.toml.example
 
-# Generated agent-discovery links
-.claude/skills/*
-!.claude/skills/.gitkeep
-.agents/skills/*
-!.agents/skills/.gitkeep
-
-# Local Skill repositories are independent from the parent repository
-/skills/*
-!/skills/README.md
-!/skills/.gitkeep
+# Generated local artifacts
+*.tgz

@@ -7,7 +7,7 @@
   "options": {
     "claudeCodeVersion": {
       "type": "string",
-      "default": "2.1.227",
+      "default": "2.1.229",
       "description": "Exact @anthropic-ai/claude-code npm package version."
     },
     "codexVersion": {

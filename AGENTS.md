@@ -17,13 +17,13 @@
 - `test/<feature-id>/`は対応するFeatureを実containerで検証する。
 - project固有runtime、service、port、dependencyはconsumer repositoryへ置く。
 - consumer repositoryをこのrepository配下へcloneするworkspace機構、Skill探索link、submodule管理を追加しない。
-- Claude Code / Codexの既定versionは`package.json`とFeature metadataで一致させる。
+- Claude Code / Codexの既定versionはFeature metadataだけで管理し、別のdependency manifestへ複製しない。
 
 ## Workflow
 
 1. Featureの挙動を変更する場合は`src/agent-dev/`と対応するtestを更新する。
 2. release対象の変更では`src/agent-dev/devcontainer-feature.json`のSemVerを更新する。
-3. Claude Code / Codexの既定versionを変える場合は`package.json`も同時に更新する。
+3. Claude Code / Codexの既定versionを変える場合はFeature metadataを更新し、実container testで導入結果を確認する。
 4. `make validate`を実行する。
 5. Dockerが利用できる場合は`make test`も実行する。
 6. PRでは`feature-ci`と`security`が成功していることを確認する。

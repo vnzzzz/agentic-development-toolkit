@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-claude --version | grep -F '2.1.227'
-codex --version | grep -F '0.147.0'
+claude --version >/dev/null
+codex --version >/dev/null
 gh --version >/dev/null
 git --version
 jq --version

@@ -53,13 +53,13 @@ credential、named volume、host mount、trusted repositoryに関する要件と
 
 ## Versioning
 
-Feature versionは`src/agent-dev/devcontainer-feature.json`のSemVerで管理します。
+Feature versionとClaude Code / Codexの既定versionは`src/agent-dev/devcontainer-feature.json`を唯一の正本として管理します。
 
 - patch: bug fix、CLI patch更新など後方互換な修正
 - minor: 後方互換な機能追加
 - major: consumer側の変更が必要なbreaking change
 
-Claude Code / Codexの既定versionはFeature metadataと`package.json`の両方で固定し、CIで一致を検証します。
+Agent CLIの既定version更新はFeature contractの変更として手動で行います。npm dependency manifestやDependabot PRへversionを複製しません。install scriptはFeature optionで指定されたexact versionを導入し、導入後にversion一致を検証します。
 
 published exact versionはimmutableとして扱います。同じ`1.0.0`を異なる内容で再publishしません。
 
@@ -129,7 +129,6 @@ make test
 
 - Feature metadata JSON
 - shell syntax / ShellCheck
-- Claude Code / Codex version pinの整合
 - release version guardの分岐
 
 `make test`はさらに`devcontainer features test`でFeatureを実containerへ導入し、Agent CLI、`agent-skills` Plugin bootstrap、認証volumeの書き込み可能性を確認します。

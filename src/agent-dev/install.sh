@@ -40,6 +40,21 @@ npm install --global \
   "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
   "@openai/codex@${CODEX_VERSION}"
 
+claude_version_output=$(claude --version)
+codex_version_output=$(codex --version)
+claude_installed_version=${claude_version_output%% *}
+codex_version_rest=${codex_version_output#* }
+codex_installed_version=${codex_version_rest%% *}
+
+if [[ "$claude_installed_version" != "$CLAUDE_CODE_VERSION" ]]; then
+  echo "ERROR: expected Claude Code ${CLAUDE_CODE_VERSION}, got: ${claude_version_output}" >&2
+  exit 1
+fi
+if [[ "$codex_installed_version" != "$CODEX_VERSION" ]]; then
+  echo "ERROR: expected Codex ${CODEX_VERSION}, got: ${codex_version_output}" >&2
+  exit 1
+fi
+
 remote_user=${_REMOTE_USER:-${_CONTAINER_USER:-root}}
 if ! id "$remote_user" >/dev/null 2>&1; then
   echo "ERROR: Dev Container remote user '$remote_user' does not exist." >&2
@@ -56,6 +71,6 @@ chown -R "$remote_user:$remote_group" /var/lib/agentic-dev
 install -d -m 0755 /usr/local/share/agentic-dev
 install -m 0755 "$SCRIPT_DIR/post-create.sh" /usr/local/share/agentic-dev/post-create.sh
 
-claude --version
-codex --version
+printf '%s\n' "$claude_version_output"
+printf '%s\n' "$codex_version_output"
 gh --version | head -n 1

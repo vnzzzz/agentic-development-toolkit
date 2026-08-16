@@ -1,9 +1,16 @@
 # Claude Code向け補足
 
-Repository全体の作業ルールは`AGENTS.md`を正本とし、Claude Codeでも同じルールに従います。
+Repository全体の作業ルールは`AGENTS.md`を正本とします。Claude Code固有の例外はありません。
 
-Claude Code固有の注意点は次のとおりです。
+## Workflow
 
-- `.claude/skills/`はstandalone / collection Skillのローカル開発用に生成されるため、リンク先ではなく生成リンク自体を編集しない。
-- Plugin repositoryのworking copyをPluginとして確認する場合は、個別Skillを`.claude/skills/`へ展開せず、`claude --plugin-dir <plugin-root>`を使用する。
-- 完了前の必須checkは`AGENTS.md`に従う。
+- Feature sourceは`src/agent-dev/`、実container testは`test/agent-dev/`を変更する。
+- consumer repositoryやAgent Skill sourceをこのrepository配下へcloneして管理しない。
+- release対象の変更ではFeature versionを更新する。
+- 完了前のcheckは`AGENTS.md`に従う。
+
+## Supporting documents
+
+- [AGENTS.md](AGENTS.md)
+- [docs/dev-container-feature.md](docs/dev-container-feature.md)
+- [SECURITY.md](SECURITY.md)

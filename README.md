@@ -1,67 +1,53 @@
-# Agent Skill 開発ワークスペース
+# Agentic Development Toolkit
 
-Claude CodeとCodexの両方でAgent Skillを開発するためのワークスペースです。
+Claude CodeとCodexを利用する複数projectへ、共通のDev Container Featureを配布するrepositoryです。
 
-この親リポジトリは、Dev Container、Skillの探索・検証ツール、standalone Skill用テンプレート、親CIを管理します。実際に開発するSkillの正本は、`repos/`配下へ配置する独立したSkillソースリポジトリが持ちます。
+各consumer repositoryは自身をVS Code workspace / Git rootとして直接開きます。このrepositoryはconsumer sourceを配下へcloneして管理する親workspaceではありません。
 
-## はじめに
+`agent-dev`の提供範囲、consumer責務、versioning、update、release contractは[共通Dev Container Feature](docs/dev-container-feature.md)を正本とします。
 
-推奨する利用方法はDev Containerです。
+## Consumer workflow
 
-1. VS Codeで **Dev Containers: Reopen in Container** を実行する。
-2. 必要に応じてClaude Code、Codex、GitHub CLIで認証を行う。
-3. `make doctor` で開発toolとローカルSkillの状態を確認する。
-4. `make test` で親ワークスペースを検証する。
+GHCRへ公開されたFeatureは、consumer側の`.devcontainer/devcontainer.json`から参照します。
 
-Dev Containerを使わない場合は、`make bootstrap` で親ワークスペース用のローカル環境とSkill探索リンクを準備できます。Agent CLI、GitHub CLI、共有Plugin、各Skill固有の依存関係は導入しません。
-
-## 3つの利用モード
-
-| モード | 用途 | 読み込み方 |
-|---|---|---|
-| 通常利用 | このワークスペース自身が共通Skillを利用する | public `vnzzzz/agent-skills` Pluginを利用 |
-| ローカル開発 | standalone / collection Skillのworking treeを編集する | `.claude/skills/` / `.agents/skills/` からSkill rootへ直接リンク |
-| 配布検証 | 実際の配布範囲でSkillまたはPluginが成立することを確認する | 各source repositoryのCIまたはnative Plugin toolingで検証 |
-
-ローカル開発用の直接リンクは、編集内容をすぐにAgentへ反映するための仕組みです。Pluginのnamespaceやpackagingを含む配布状態の検証とは区別します。
-
-詳細は [Skillソースリポジトリの運用](docs/skill-repository-management.md) を参照してください。
-
-## 対応するSkillソースリポジトリ
-
-```text
-standalone repository
-repos/<repository>/skill/SKILL.md
-
-collection repository
-repos/<repository>/skills/<skill-name>/SKILL.md
-
-Plugin marketplace repository
-repos/<repository>/plugins/<plugin-name>/skills/<skill-name>/SKILL.md
+```json
+{
+  "name": "example-project",
+  "image": "mcr.microsoft.com/devcontainers/base:bookworm",
+  "features": {
+    "ghcr.io/vnzzzz/agentic-development-toolkit/agent-dev:1": {}
+  },
+  "remoteUser": "vscode"
+}
 ```
 
-`repos/*` は親Gitの管理対象外です。各source repositoryが自身のGit履歴、PR、CI、依存関係、version、releaseを管理します。親リポジトリからsubmoduleとして固定しません。
+consumer repositoryでは`.devcontainer-lock.json`をcommitします。詳細な利用手順は[共通Dev Container Feature](docs/dev-container-feature.md#consumer-workflow)を参照してください。
 
-## 主なコマンド
+## Authoring workflow
 
-| コマンド | 役割 |
-|---|---|
-| `make validate` | ローカルSkillの配置、frontmatter、Skill root境界を検証する |
-| `make link-skills` | standalone / collection Skillの開発用リンクを同期する |
-| `make doctor` | Agent CLI、GitHub CLI、ローカルSkillの状態を表示する |
-| `make test` | 親ワークスペースのtestとsecurity auditを実行する |
-| `make audit` | 親ワークスペースのsecurity設定を監査する |
-| `make bootstrap` | Dev Containerを使わない場合の親ローカル環境を準備する |
+このrepository自身の`.devcontainer/`はFeature authoring用の最小環境です。未releaseの`agent-dev`を自己参照せず、`src/`と`test/`を直接検証します。
 
-Skill固有のtestや依存関係の導入は、各source repository側で実行します。
+```bash
+make validate
+make test
+```
 
-## 文書
+## Release
 
-- [Skillソースリポジトリの運用](docs/skill-repository-management.md): repository layout、ローカル開発、配布検証、Git / CI責務
-- [GitHub repository設定](docs/github-repository-settings.md): branch protectionやGitHub security設定
-- [セキュリティポリシー](SECURITY.md): trust modelとsecurity boundary
-- [ADR 0001](docs/adr/0001-polyrepo-workspace.md): 独立したSkill repositoryを扱うpolyrepo workspaceの採用
-- [ADR 0002](docs/adr/0002-skill-collection-repositories.md): standalone / collection repository対応
-- [ADR 0003](docs/adr/0003-authoring-and-distribution-validation.md): ローカル開発と配布検証の分離
+Featureは`main`からGitHub Actionsでreleaseします。手順とrelease contractは[共通Dev Container Feature](docs/dev-container-feature.md#release-workflow)を参照してください。
 
-`repos/`直下での最小操作は [repos/README.md](repos/README.md) を参照してください。
+## Repository layout
+
+```text
+src/agent-dev/                    Featureの配布物
+test/agent-dev/                   実container test
+scripts/check-release-version.sh  release前のversion検証
+.github/workflows/                CI / security / release
+docs/dev-container-feature.md     consumer / version / releaseの正本
+```
+
+## Supporting documents
+
+- Featureの利用・version・release: [docs/dev-container-feature.md](docs/dev-container-feature.md)
+- trust boundaryとcredential: [SECURITY.md](SECURITY.md)
+- repository変更時の制約: [AGENTS.md](AGENTS.md)

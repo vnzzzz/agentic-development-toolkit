@@ -1,27 +1,21 @@
-PYTHON ?= python3
+BASE_IMAGE ?= mcr.microsoft.com/devcontainers/base:bookworm
 
-.PHONY: validate link-skills workspace-test test audit doctor clean bootstrap
+SHELL_SCRIPTS := \
+	src/agent-dev/install.sh \
+	src/agent-dev/post-create.sh \
+	scripts/check-release-version.sh \
+	test/agent-dev/test.sh \
+	test/release-version-check.sh
+
+.PHONY: validate test
 
 validate:
-	$(PYTHON) scripts/skill_workspace.py validate
+	jq -e . src/agent-dev/devcontainer-feature.json >/dev/null
+	bash -n $(SHELL_SCRIPTS)
+	shellcheck $(SHELL_SCRIPTS)
+	test "$$(jq -r '.dependencies["@anthropic-ai/claude-code"]' package.json)" = "$$(jq -r '.options.claudeCodeVersion.default' src/agent-dev/devcontainer-feature.json)"
+	test "$$(jq -r '.dependencies["@openai/codex"]' package.json)" = "$$(jq -r '.options.codexVersion.default' src/agent-dev/devcontainer-feature.json)"
+	bash test/release-version-check.sh
 
-link-skills:
-	$(PYTHON) scripts/skill_workspace.py link
-
-workspace-test:
-	$(PYTHON) -m unittest discover -s tests -v
-
-test: workspace-test audit
-
-audit:
-	$(PYTHON) scripts/security_audit.py
-
-doctor:
-	$(PYTHON) scripts/skill_workspace.py doctor
-
-bootstrap:
-	bash scripts/bootstrap-local.sh
-
-clean:
-	rm -rf build .venv .pytest_cache .ruff_cache
-	find scripts tests templates -type d -name __pycache__ -prune -exec rm -rf {} +
+test: validate
+	devcontainer features test -f agent-dev -i $(BASE_IMAGE) .

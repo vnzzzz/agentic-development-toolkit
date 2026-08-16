@@ -1,38 +1,50 @@
 # セキュリティポリシー
 
-## 信頼モデル
+`agent-dev`はClaude Code、Codex、GitHub CLIを導入し、認証状態をDev Container内へ永続化します。認証済みcontainerで同じuser権限により実行されるcodeは、その認証状態へアクセスできるため、trusted repositoryでの利用を前提とします。
 
-Agent Skillは、instructionsだけでなくscript、dependency、symlink、binary assetを含み得る実行可能なsupply-chain inputとして扱います。
+## Security constraints
 
-Skillを利用する前に、そのsource repositoryが配布する`SKILL.md`とruntime resourceを確認し、必要な権限と外部アクセスを把握してください。
+- Feature source、test fixture、GHCR artifactへcredential、token、認証済みconfigを含めない。
+- hostのcredential directory、SSH directory、Docker socketをbind mountしない。
+- Claude Code、Codex、GitHub CLIの認証状態を相互に分離する。
+- volume名へ`${devcontainerId}`を含め、Dev Container単位で認証状態を分離する。
+- Claude Code / Codex CLIの既定versionを固定する。
+- Node.js / GitHub CLIは公式Dev Container Featureへの依存として導入する。
+- 外部GitHub Actionsはfull commit SHAへ固定する。
+- release workflowの権限は`contents: read`と`packages: write`に限定する。
+- 個人PATをrelease用CI secretとして保存しない。
 
-## 親ワークスペースのセキュリティ制御
+## Credential boundary
 
-親リポジトリは次を管理します。
+Featureは次のnamed volumeを利用します。
 
-- Dev Containerはnon-rootの`vscode` userで実行する。
-- Claude Code、Codex、GitHub CLIの認証情報は相互に分離したnamed volumeへ保存する。
-- repository設定からhost credential directoryやDocker socketをmountしない。
-- Agent CLIのversionは`package.json`で固定する。
-- GitHub CLIは公式Dev Container Feature `ghcr.io/devcontainers/features/github-cli:1`から導入する。
-- Dev Container起動時にGit初期化、submodule更新、source repository固有dependencyの導入、source repository固有testの実行を行わない。
-- post-create時のローカルSkill link生成はbest-effortとし、不正なローカルsourceが親環境そのものの利用を妨げないようにする。
-- 親CIは親のcode、shell script、configuration、template、security設定を検証し、`repos/*`のSkill固有runtimeを中央実行しない。
-- 外部GitHub Actionsはfull commit SHAで固定する。
+- Claude Code: `agentic-dev-claude-${devcontainerId}`
+- Codex: `agentic-dev-codex-${devcontainerId}`
+- GitHub CLI: `agentic-dev-gh-${devcontainerId}`
 
-## Skillソースリポジトリとの境界
+volume名、container内mount先、環境変数は秘密情報ではありません。これらが公開されてもcredentialそのものはFeature sourceやGHCR artifactへ含まれません。
 
-`repos/*`は親Gitからignoreされます。各source repositoryは、自身のSkill本体、runtime dependency、test、fixture、manifest、CI、security update、releaseを所有します。
+一方、認証済みcontainer内のcodeは同じuser権限で認証状態へアクセスできます。未確認のrepository、script、dependencyをcredential access可能な状態で実行しないでください。
 
-standalone Skillでは`skill/`全体を配布バンドルとし、配布後にrepository-only fileへ依存しないことをsource repository側で検証します。Plugin repositoryでは、provider自身がPlugin metadataとnative Plugin loadingを検証します。
+認証状態を破棄する場合は対象Dev Containerを削除し、対応するnamed volumeを削除します。必要に応じてprovider側でもtoken / sessionをrevokeします。
 
-第三者のSkillをリンクまたは実行する前に、少なくとも次を確認してください。
+## Release supply chain
 
-1. `SKILL.md`、bundled script、dependency、binary asset、symlinkを確認する。
-2. network access、subprocess、credential access、filesystem write、destructive operationが必要か確認する。
-3. source repositoryが提供するtestとsecurity checkを実行する。
-4. credential、Skill root外へescapeするsymlink、obfuscated code、mutable remote URLから直接実行されるcodeを許可しない。
+published exact Feature versionは、supply-chain上の識別子としてimmutableに扱います。release workflowは最小権限の`GITHUB_TOKEN`を使用し、外部Actionをfull commit SHAへ固定します。
 
-## セキュリティ問題の報告
+version判定、失敗条件、publish手順などのrelease behaviorは[共通Dev Container Feature](docs/dev-container-feature.md#release-workflow)を正本とします。
 
-Issueへcredentialや機密sourceを貼り付けないでください。再現に必要な最小情報、関連version、機密情報を除去したcommand outputを共有してください。
+## Authoring boundary
+
+このrepository自身の`.devcontainer/`はFeature authoring用の最小環境です。配布対象の`agent-dev`を自己参照せず、consumer repositoryを配下へcloneする親workspaceも持ちません。
+
+実container testはDockerが利用できる環境またはGitHub Actionsで行います。distributed FeatureへDocker socket mountやprivileged設定を追加してtest環境を成立させません。
+
+## Reporting
+
+Issueへcredentialや機密sourceを貼り付けないでください。再現に必要な最小情報、関連version、機密情報を除去したcommand outputだけを共有してください。
+
+## Supporting documents
+
+- Featureのconsumer / release contract: [docs/dev-container-feature.md](docs/dev-container-feature.md)
+- repository変更時の制約: [AGENTS.md](AGENTS.md)

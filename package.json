@@ -1,8 +1,8 @@
 {
-  "name": "agent-skill-development-tools",
+  "name": "agentic-development-toolkit",
   "private": true,
   "version": "0.0.0",
-  "description": "Pinned agent CLI versions for the development container.",
+  "description": "Pinned agent CLI versions used by the shared Dev Container Feature.",
   "dependencies": {
     "@anthropic-ai/claude-code": "2.1.227",
     "@openai/codex": "0.147.0"

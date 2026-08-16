@@ -1,9 +1,6 @@
 {
-  "name": "agent-skill-development",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".."
-  },
+  "name": "agentic-development-toolkit",
+  "image": "mcr.microsoft.com/devcontainers/base:bookworm",
   "features": {
     "ghcr.io/devcontainers/features/github-cli:1": {},
     "ghcr.io/devcontainers/features/node:1": {
@@ -12,34 +9,17 @@
     }
   },
   "remoteUser": "vscode",
-  "mounts": [
-    "source=agent-skill-claude-${devcontainerId},target=/home/vscode/.claude,type=volume",
-    "source=agent-skill-codex-${devcontainerId},target=/home/vscode/.codex,type=volume",
-    "source=agent-skill-gh-${devcontainerId},target=/home/vscode/.config/gh,type=volume"
-  ],
-  "containerEnv": {
-    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
-    "CODEX_HOME": "/home/vscode/.codex",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-    "DISABLE_AUTOUPDATER": "1",
-    "PYTHONDONTWRITEBYTECODE": "1",
-    "PIP_DISABLE_PIP_VERSION_CHECK": "1"
-  },
-  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "updateContentCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends jq make shellcheck && sudo rm -rf /var/lib/apt/lists/* && npm install --global @devcontainers/cli@0.88.0",
   "customizations": {
     "vscode": {
-      "extensions": [
-        "anthropic.claude-code",
-        "openai.chatgpt",
-        "ms-python.python"
-      ],
       "settings": {
-        "python.defaultInterpreterPath": "/opt/venv/bin/python",
         "terminal.integrated.defaultProfile.linux": "bash",
-        "files.exclude": {
-          ".claude/skills": true,
-          ".agents/skills": true
-        }
+        "json.schemas": [
+          {
+            "fileMatch": ["*/devcontainer-feature.json"],
+            "url": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainerFeature.schema.json"
+          }
+        ]
       }
     }
   }

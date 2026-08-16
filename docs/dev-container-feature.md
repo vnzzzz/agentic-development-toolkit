@@ -107,11 +107,15 @@ version確認はfail-closedです。
 - exact versionが存在しない: publishへ進む
 - registryの照会結果を判定できない: release失敗
 
-初回publish時のpackageはprivateです。匿名pullさせる場合はGitHubのPackage settingsでpackage visibilityをpublicへ変更します。visibilityはpackage単位なので、同じpackageへ追加される後続versionごとにpublic化を繰り返す必要はありません。
+consumerやこのrepository自身が認証なしで利用するには、Feature collection metadata packageと`agent-dev` packageの両方がPublicであることをPackage settingsで確認します。
 
 ## Authoring workflow
 
-このrepository自身の`.devcontainer/`はFeature authoring用の最小環境です。未releaseの`agent-dev`を自己参照しません。
+このrepository自身の`.devcontainer/`も、GHCRへ公開済みの`agent-dev:1`を利用します。commit済み`.devcontainer-lock.json`が開発環境として使うexact versionとdigestを固定します。
+
+これは循環依存ではありません。Featureの配布境界は`src/agent-dev/`だけであり、repositoryの`.devcontainer/`はFeature artifactへ含まれません。self-hosting側は既にpublish済みartifactをconsumeし、編集中のFeature sourceを直接参照しません。
+
+次versionを開発している間も、toolkit自身のDev Containerは直前に採用した公開済みversionを使います。候補versionは次のコマンドでsourceから別containerへ導入して検証します。
 
 静的検証:
 
@@ -131,7 +135,9 @@ make test
 - shell syntax / ShellCheck
 - release version guardの分岐
 
-`make test`はさらに`devcontainer features test`でFeatureを実containerへ導入し、Agent CLI、`agent-skills` Plugin bootstrap、認証volumeの書き込み可能性を確認します。
+`make test`はさらに`devcontainer features test`で編集中のFeature sourceを別containerへ導入し、Agent CLI、`agent-skills` Plugin bootstrap、認証volumeの書き込み可能性を確認します。
+
+新しいFeature versionをreleaseした後、このrepository自身でも採用する場合は別changeとして`devcontainer upgrade`を実行し、`.devcontainer-lock.json`の差分をreviewします。未公開versionへself-hosting lockfileを先行更新しません。
 
 ## Supporting documents
 

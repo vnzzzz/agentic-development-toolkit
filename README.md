@@ -25,12 +25,14 @@ consumer repositoryでは`.devcontainer-lock.json`をcommitします。詳細な
 
 ## Authoring workflow
 
-このrepository自身の`.devcontainer/`はFeature authoring用の最小環境です。未releaseの`agent-dev`を自己参照せず、`src/`と`test/`を直接検証します。
+このrepository自身も公開済み`agent-dev:1`を利用します。`.devcontainer-lock.json`は開発環境として使う公開済みartifactを固定し、編集中の`src/agent-dev/`は自己参照しません。
 
 ```bash
 make validate
 make test
 ```
+
+開発中Featureの検証とself-hosting環境の更新手順は[共通Dev Container Feature](docs/dev-container-feature.md#authoring-workflow)を参照してください。
 
 ## Release
 

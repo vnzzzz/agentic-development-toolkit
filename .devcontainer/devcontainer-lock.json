@@ -1,5 +1,14 @@
 {
   "features": {
+    "ghcr.io/vnzzzz/agentic-development-toolkit/agent-dev:1": {
+      "version": "1.0.0",
+      "resolved": "ghcr.io/vnzzzz/agentic-development-toolkit/agent-dev@sha256:d691b4cf91e54410c1d87fd7ae2dd4d0bedb4ee95fbccb08e59c65cc42e0477e",
+      "integrity": "sha256:d691b4cf91e54410c1d87fd7ae2dd4d0bedb4ee95fbccb08e59c65cc42e0477e",
+      "dependsOn": [
+        "ghcr.io/devcontainers/features/node:1",
+        "ghcr.io/devcontainers/features/github-cli:1"
+      ]
+    },
     "ghcr.io/devcontainers/features/github-cli:1": {
       "version": "1.1.0",
       "resolved": "ghcr.io/devcontainers/features/github-cli@sha256:d22f50b70ed75339b4eed1ba9ecde3a1791f90e88d37936517e3bace0bbad671",

@@ -2,14 +2,10 @@
   "name": "agentic-development-toolkit",
   "image": "mcr.microsoft.com/devcontainers/base:bookworm",
   "features": {
-    "ghcr.io/devcontainers/features/github-cli:1": {},
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "22",
-      "installYarnUsingApt": false
-    }
+    "ghcr.io/vnzzzz/agentic-development-toolkit/agent-dev:1": {}
   },
   "remoteUser": "vscode",
-  "updateContentCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends jq make shellcheck && sudo rm -rf /var/lib/apt/lists/* && npm install --global @devcontainers/cli@0.88.0",
+  "updateContentCommand": "npm install --global @devcontainers/cli@0.88.0",
   "customizations": {
     "vscode": {
       "settings": {

@@ -46,7 +46,9 @@ Claude / CodexからGitHubへwriteする場合は、Agentごとの専用GitHub A
 
 認証sessionではactivation時のrepositoryだけにscopeした短命Installation Tokenを必要時に発行し、`gh` / Git HTTPS credentialへ供給します。tokenはdisk、named volume、`gh auth` credential storeへ保存しません。
 
-Human credentialへのfallbackを避けるため、App-authenticated `gh`は永続化されたHuman用`GH_CONFIG_DIR`を参照せず、commandごとの一時config directoryを使用します。hostは`github.com`、default repositoryはactivation時のrepositoryに固定し、Enterprise用token環境変数とinteractive promptを無効化します。
+App sessionはcredential sourceを排他的にします。`GH_TOKEN` / `GITHUB_TOKEN` / Enterprise token環境変数が既に設定されている場合、または永続`gh auth`設定に既知のaccountが存在する場合はsessionを開始しません。Human credentialをshadowして継続するのではなくfail closedします。
+
+App-authenticated `gh`は永続化されたHuman用`GH_CONFIG_DIR`を参照せず、commandごとの一時config directoryを使用します。hostは`github.com`、default repositoryはactivation時のrepositoryに固定し、Enterprise用token環境変数とinteractive promptを無効化します。
 
 Gitはsession内でlower-precedence credential helperをresetし、`credential.useHttpPath`でactivation時repositoryのpath一致を要求します。lower-precedenceの`http.extraHeader`も空値でresetし、GitHub接続でSSH credentialへfallbackしないよう`GIT_SSH_COMMAND`とaskpassを無効化します。
 

@@ -31,9 +31,12 @@ configure_profile() {
   profile_dir=$(agent_github_profile_dir "$profile")
   config_path=$(agent_github_config_path "$profile")
 
+  # Validate the complete lexical path before mkdir so an existing symlink in
+  # any parent component cannot redirect credential creation outside $HOME.
+  agent_github_assert_no_symlink_components "$profile_dir"
   for dir in "$config_root" "$apps_root" "$profile_dir"; do
-    [[ ! -L $dir ]] || agent_github_die "GitHub App config directory must not be a symlink: $dir"
     mkdir -p "$dir"
+    agent_github_assert_no_symlink_components "$dir"
     chmod 0700 "$dir"
   done
 
@@ -41,6 +44,7 @@ configure_profile() {
   jq -n --argjson app_id "$app_id" '{app_id:$app_id}' >"$temp_path"
   chmod 0600 "$temp_path"
   mv "$temp_path" "$config_path"
+  agent_github_validate_profile_storage "$profile"
 
   printf 'Configured GitHub App profile: %s\n' "$profile"
   printf 'Private key path: %s\n' "$(agent_github_key_path "$profile")"
@@ -113,7 +117,7 @@ assert_exclusive_app_credentials() {
 activate_profile() {
   local profile=$1
   shift
-  local token shell_bin repository
+  local token shell_bin repository repo_http_url
 
   # Enforce an exclusive App-authenticated identity before touching the App key.
   assert_exclusive_app_credentials
@@ -122,6 +126,7 @@ activate_profile() {
   agent_github_validate_private_key "$AGENT_GITHUB_KEY_PATH"
   agent_github_current_repo
   repository=$AGENT_GITHUB_REPO_FULL_NAME
+  repo_http_url="https://github.com/${repository}"
   agent_github_bot_identity "$profile"
 
   # Freeze the repository selected at activation. Wrappers continue to mint
@@ -142,12 +147,16 @@ activate_profile() {
 
   # Remove inherited Git credential paths inside the App-authenticated session.
   # The empty helper resets lower-precedence helpers before ours. Empty
-  # extraHeader values reset inherited Authorization headers from lower scopes.
+  # extraHeader values reset inherited Authorization headers. Repository-specific
+  # reset entries are required because Git URL matching prefers a more-specific
+  # http.<url>.extraHeader over host/global values.
   add_git_config credential.helper ''
   add_git_config credential.helper '!agent-github-credential'
   add_git_config credential.useHttpPath true
   add_git_config http.extraHeader ''
   add_git_config http.https://github.com/.extraHeader ''
+  add_git_config "http.${repo_http_url}.extraHeader" ''
+  add_git_config "http.${repo_http_url}.git.extraHeader" ''
   add_git_config user.name "$AGENT_GITHUB_BOT_LOGIN"
   add_git_config user.email "$AGENT_GITHUB_BOT_EMAIL"
   add_git_config url.https://github.com/.insteadOf git@github.com:

@@ -11,8 +11,10 @@ profile=${AGENT_GITHUB_PROFILE:-}
 if [[ -z $profile ]]; then
   exec "$real_gh" "$@"
 fi
+repository=${AGENT_GITHUB_REPOSITORY:-}
+[[ -n $repository ]] || agent_github_die 'AGENT_GITHUB_REPOSITORY is not set in authenticated GitHub App session'
 
-token=$(agent_github_mint_token "$profile")
+token=$(agent_github_mint_token "$profile" "$repository")
 set +e
 env -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_ENTERPRISE_TOKEN \
   GH_TOKEN="$token" "$real_gh" "$@"

@@ -41,8 +41,6 @@ agent_github_load_profile() {
 
   AGENT_GITHUB_APP_ID=$(jq -er '.app_id | tostring | select(test("^[0-9]+$"))' "$config_path") || \
     agent_github_die "config app_id must be numeric: $config_path"
-  AGENT_GITHUB_APP_SLUG=$(jq -er '.app_slug | strings | select(test("^[A-Za-z0-9-]+$"))' "$config_path") || \
-    agent_github_die "config app_slug is invalid: $config_path"
   AGENT_GITHUB_KEY_PATH=$(agent_github_key_path "$profile")
 }
 
@@ -163,17 +161,37 @@ agent_github_revoke_token() {
 }
 
 agent_github_bot_identity() {
-  local profile=$1 response bot_id bot_login
+  local profile=$1 jwt app_response app_id app_slug user_response bot_id bot_login expected_login
 
   agent_github_load_profile "$profile"
-  response=$(curl --fail-with-body --silent --show-error \
+  agent_github_validate_private_key "$AGENT_GITHUB_KEY_PATH"
+
+  jwt=$(agent_github_jwt "$AGENT_GITHUB_APP_ID" "$AGENT_GITHUB_KEY_PATH")
+  app_response=$(curl --fail-with-body --silent --show-error \
+    -H 'Accept: application/vnd.github+json' \
+    -H "Authorization: Bearer $jwt" \
+    -H "X-GitHub-Api-Version: $AGENT_GITHUB_API_VERSION" \
+    "$AGENT_GITHUB_API_URL/app") || \
+    agent_github_die "cannot resolve metadata for authenticated GitHub App ID $AGENT_GITHUB_APP_ID"
+  app_id=$(jq -er '.id | tostring | select(test("^[0-9]+$"))' <<<"$app_response") || \
+    agent_github_die 'authenticated App response did not contain a numeric id'
+  [[ $app_id == "$AGENT_GITHUB_APP_ID" ]] || \
+    agent_github_die "authenticated App ID mismatch: configured $AGENT_GITHUB_APP_ID, returned $app_id"
+  app_slug=$(jq -er '.slug | strings | select(test("^[A-Za-z0-9-]+$"))' <<<"$app_response") || \
+    agent_github_die 'authenticated App response did not contain a valid slug'
+
+  user_response=$(curl --fail-with-body --silent --show-error \
     -H 'Accept: application/vnd.github+json' \
     -H "X-GitHub-Api-Version: $AGENT_GITHUB_API_VERSION" \
-    "$AGENT_GITHUB_API_URL/users/${AGENT_GITHUB_APP_SLUG}%5Bbot%5D") || \
-    agent_github_die "cannot resolve GitHub App bot user for slug: $AGENT_GITHUB_APP_SLUG"
-  bot_id=$(jq -er '.id' <<<"$response") || agent_github_die "bot user response did not contain an id"
-  bot_login=$(jq -er '.login' <<<"$response") || agent_github_die "bot user response did not contain a login"
+    "$AGENT_GITHUB_API_URL/users/${app_slug}%5Bbot%5D") || \
+    agent_github_die "cannot resolve GitHub App bot user for authenticated App slug: $app_slug"
+  bot_id=$(jq -er '.id' <<<"$user_response") || agent_github_die "bot user response did not contain an id"
+  bot_login=$(jq -er '.login' <<<"$user_response") || agent_github_die "bot user response did not contain a login"
+  expected_login=${app_slug}[bot]
+  [[ $bot_login == "$expected_login" ]] || \
+    agent_github_die "bot login mismatch for authenticated App: expected $expected_login, returned $bot_login"
 
+  export AGENT_GITHUB_APP_SLUG=$app_slug
   export AGENT_GITHUB_BOT_ID=$bot_id
   export AGENT_GITHUB_BOT_LOGIN=$bot_login
   export AGENT_GITHUB_BOT_EMAIL=${bot_id}+${bot_login}@users.noreply.github.com

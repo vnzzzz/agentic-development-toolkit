@@ -42,13 +42,14 @@ configure_profile() {
 
 status_profile() {
   local profile=$1
-  local token
+  local token repository
 
   agent_github_load_profile "$profile"
   agent_github_validate_private_key "$AGENT_GITHUB_KEY_PATH"
   agent_github_current_repo
+  repository=$AGENT_GITHUB_REPO_FULL_NAME
   agent_github_bot_identity "$profile"
-  token=$(agent_github_mint_token "$profile")
+  token=$(agent_github_mint_token "$profile" "$repository")
   if ! agent_github_revoke_token "$token" >/dev/null 2>&1; then
     agent_github_die 'repository-scoped installation token was minted but could not be revoked'
   fi
@@ -56,7 +57,7 @@ status_profile() {
   printf 'Profile: %s\n' "$profile"
   printf 'App: %s (ID %s)\n' "$AGENT_GITHUB_APP_SLUG" "$AGENT_GITHUB_APP_ID"
   printf 'Actor: %s <%s>\n' "$AGENT_GITHUB_BOT_LOGIN" "$AGENT_GITHUB_BOT_EMAIL"
-  printf 'Repository: %s\n' "$AGENT_GITHUB_REPO_FULL_NAME"
+  printf 'Repository: %s\n' "$repository"
   printf 'Private key: %s (validated, mode 0600)\n' "$AGENT_GITHUB_KEY_PATH"
   printf 'Repository-scoped installation token: mint/revoke succeeded\n'
 }
@@ -74,22 +75,26 @@ add_git_config() {
 activate_profile() {
   local profile=$1
   shift
-  local token shell_bin
+  local token shell_bin repository
 
   agent_github_load_profile "$profile"
   agent_github_validate_private_key "$AGENT_GITHUB_KEY_PATH"
   agent_github_current_repo
+  repository=$AGENT_GITHUB_REPO_FULL_NAME
   agent_github_bot_identity "$profile"
 
+  # Freeze the repository selected at activation. Wrappers continue to mint
+  # tokens for this repository even if the interactive shell later changes cwd.
+  export AGENT_GITHUB_PROFILE=$profile
+  export AGENT_GITHUB_REPOSITORY=$repository
+
   # Fail closed before entering the session if the App is not installed for the
-  # current repository or a repository-scoped token cannot complete its lifecycle.
-  token=$(agent_github_mint_token "$profile")
+  # selected repository or a repository-scoped token cannot complete its lifecycle.
+  token=$(agent_github_mint_token "$profile" "$repository")
   if ! agent_github_revoke_token "$token" >/dev/null 2>&1; then
     agent_github_die 'preflight installation token was minted but could not be revoked'
   fi
 
-  export AGENT_GITHUB_PROFILE=$profile
-  export AGENT_GITHUB_REPOSITORY=$AGENT_GITHUB_REPO_FULL_NAME
   export AGENT_GITHUB_BOT_NAME=$AGENT_GITHUB_BOT_LOGIN
   export AGENT_GITHUB_BOT_EMAIL
   export PATH=/usr/local/lib/agent-dev/auth-bin:$PATH
@@ -113,7 +118,7 @@ activate_profile() {
   unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN
 
   printf 'GitHub App session: %s as %s for %s\n' \
-    "$profile" "$AGENT_GITHUB_BOT_LOGIN" "$AGENT_GITHUB_REPO_FULL_NAME"
+    "$profile" "$AGENT_GITHUB_BOT_LOGIN" "$repository"
 
   if [[ ${1:-} == -- ]]; then
     shift

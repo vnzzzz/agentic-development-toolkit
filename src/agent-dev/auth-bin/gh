@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# shellcheck source=/dev/null
+source /usr/local/lib/agent-dev/github-auth-lib.sh
+
+real_gh=/usr/local/lib/agent-dev/real-bin/gh
+[[ -x $real_gh ]] || agent_github_die "real gh binary is unavailable: $real_gh"
+
+profile=${AGENT_GITHUB_PROFILE:-}
+if [[ -z $profile ]]; then
+  exec "$real_gh" "$@"
+fi
+
+token=$(agent_github_mint_token "$profile")
+set +e
+env -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_ENTERPRISE_TOKEN \
+  GH_TOKEN="$token" "$real_gh" "$@"
+status=$?
+set -e
+agent_github_revoke_token "$token" >/dev/null 2>&1 || true
+exit "$status"

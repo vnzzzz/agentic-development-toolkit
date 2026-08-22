@@ -56,8 +56,23 @@ agent_github_validate_private_key() {
   openssl pkey -in "$key_path" -check -noout >/dev/null 2>&1 || agent_github_die "private key is not a readable unencrypted PEM private key: $key_path"
 }
 
+agent_github_set_repo_full_name() {
+  local full_name=$1 owner repo
+
+  owner=${full_name%%/*}
+  repo=${full_name#*/}
+  [[ -n $owner && -n $repo && $repo != "$full_name" && $repo != */* ]] || \
+    agent_github_die "invalid GitHub repository name: $full_name"
+  [[ $owner =~ ^[A-Za-z0-9_.-]+$ && $repo =~ ^[A-Za-z0-9_.-]+$ ]] || \
+    agent_github_die "invalid GitHub repository name: $full_name"
+
+  AGENT_GITHUB_REPO_OWNER=$owner
+  AGENT_GITHUB_REPO_NAME=$repo
+  AGENT_GITHUB_REPO_FULL_NAME=$owner/$repo
+}
+
 agent_github_current_repo() {
-  local remote path owner repo
+  local remote path
 
   [[ -x $AGENT_GITHUB_REAL_GIT ]] || agent_github_die "real git binary is unavailable: $AGENT_GITHUB_REAL_GIT"
   remote=$($AGENT_GITHUB_REAL_GIT remote get-url origin 2>/dev/null) || agent_github_die "cannot resolve git remote 'origin'"
@@ -81,13 +96,7 @@ agent_github_current_repo() {
   esac
 
   path=${path%.git}
-  owner=${path%%/*}
-  repo=${path#*/}
-  [[ -n $owner && -n $repo && $repo != "$path" && $repo != */* ]] || agent_github_die "cannot parse owner/repository from origin: $remote"
-
-  AGENT_GITHUB_REPO_OWNER=$owner
-  AGENT_GITHUB_REPO_NAME=$repo
-  AGENT_GITHUB_REPO_FULL_NAME=$owner/$repo
+  agent_github_set_repo_full_name "$path"
 }
 
 agent_github_base64url() {
@@ -127,12 +136,13 @@ agent_github_installation_id() {
 }
 
 agent_github_mint_token() {
-  local profile=$1
+  local profile=$1 repo_full_name=$2
   local jwt installation_id request response token
 
+  [[ -n $repo_full_name ]] || agent_github_die 'repository is required when minting a GitHub App token'
   agent_github_load_profile "$profile"
   agent_github_validate_private_key "$AGENT_GITHUB_KEY_PATH"
-  agent_github_current_repo
+  agent_github_set_repo_full_name "$repo_full_name"
 
   jwt=$(agent_github_jwt "$AGENT_GITHUB_APP_ID" "$AGENT_GITHUB_KEY_PATH")
   installation_id=$(agent_github_installation_id "$jwt" "$AGENT_GITHUB_REPO_OWNER" "$AGENT_GITHUB_REPO_NAME")

@@ -22,13 +22,21 @@ EOF
 
 configure_profile() {
   local profile=$1 app_id=$2 profile_dir config_path temp_path
+  local config_root apps_root dir
   agent_github_validate_profile_name "$profile"
   [[ $app_id =~ ^[0-9]+$ ]] || agent_github_die 'app-id must be numeric'
 
+  config_root=$HOME/.config/agent-dev
+  apps_root=$config_root/github-apps
   profile_dir=$(agent_github_profile_dir "$profile")
   config_path=$(agent_github_config_path "$profile")
-  mkdir -p "$profile_dir"
-  chmod 0700 "$HOME/.config/agent-dev" "$HOME/.config/agent-dev/github-apps" "$profile_dir" 2>/dev/null || true
+
+  for dir in "$config_root" "$apps_root" "$profile_dir"; do
+    [[ ! -L $dir ]] || agent_github_die "GitHub App config directory must not be a symlink: $dir"
+    mkdir -p "$dir"
+    chmod 0700 "$dir"
+  done
+
   temp_path=$(mktemp "$profile_dir/.config.XXXXXX")
   jq -n --argjson app_id "$app_id" '{app_id:$app_id}' >"$temp_path"
   chmod 0600 "$temp_path"
@@ -99,11 +107,14 @@ activate_profile() {
   export AGENT_GITHUB_BOT_EMAIL
   export PATH=/usr/local/lib/agent-dev/auth-bin:$PATH
 
-  # Remove interactive/user credential fallbacks inside the App-authenticated
-  # session. The empty helper resets lower-precedence helpers before ours.
+  # Remove inherited Git credential paths inside the App-authenticated session.
+  # The empty helper resets lower-precedence helpers before ours. Empty
+  # extraHeader values reset inherited Authorization headers from lower scopes.
   add_git_config credential.helper ''
   add_git_config credential.helper '!agent-github-credential'
   add_git_config credential.useHttpPath true
+  add_git_config http.extraHeader ''
+  add_git_config http.https://github.com/.extraHeader ''
   add_git_config user.name "$AGENT_GITHUB_BOT_LOGIN"
   add_git_config user.email "$AGENT_GITHUB_BOT_EMAIL"
   add_git_config url.https://github.com/.insteadOf git@github.com:
@@ -115,7 +126,13 @@ activate_profile() {
   export GIT_COMMITTER_EMAIL=$AGENT_GITHUB_BOT_EMAIL
   export GIT_TERMINAL_PROMPT=0
   export GIT_ASKPASS=/bin/false
-  unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN
+  export GIT_SSH_COMMAND=/bin/false
+  export SSH_ASKPASS=/bin/false
+
+  # App-authenticated gh commands use an isolated temporary GH_CONFIG_DIR in
+  # auth-bin/gh. Clear inherited host/repository/token selectors here as well so
+  # child processes cannot accidentally inherit a Human gh target.
+  unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN GH_HOST GH_REPO
 
   printf 'GitHub App session: %s as %s for %s\n' \
     "$profile" "$AGENT_GITHUB_BOT_LOGIN" "$repository"

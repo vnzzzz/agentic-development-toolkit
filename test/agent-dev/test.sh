@@ -25,6 +25,7 @@ command -v agent-github-auth >/dev/null
 command -v agent-github-credential >/dev/null
 [[ -r /usr/local/lib/agent-dev/github-auth-lib.sh ]]
 [[ -x /usr/local/lib/agent-dev/auth-bin/gh ]]
+[[ -x /usr/local/lib/agent-dev/auth-bin/git ]]
 [[ -x /usr/local/lib/agent-dev/real-bin/gh ]]
 [[ -x /usr/local/lib/agent-dev/real-bin/git ]]
 agent-github-auth --help >/dev/null

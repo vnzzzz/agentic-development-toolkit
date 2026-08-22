@@ -127,11 +127,12 @@ session内では次を自動設定します。
 
 - session開始時に選択したrepositoryだけを対象にGitHub App Installation Tokenを必要時に発行
 - `gh`実行ごとに一時`GH_CONFIG_DIR`を作り、永続化されたHuman用GitHub CLI credential / alias / extension configを参照しない
-- `gh`のhostを`github.com`、default repositoryをsession repositoryへ固定し、Enterprise token環境変数とinteractive promptを無効化
+- `gh`のdefault hostを`github.com`、default repositoryをsession repositoryへ固定し、Enterprise token環境変数とinteractive promptを無効化
+- `gh`の`--hostname`、`-R` / `--repo`、positional GitHub URLをtoken発行前に検査し、`github.com`以外を拒否
 - `gh` command終了時にtokenをbest-effortでrevokeし、一時config directoryを削除
 - `git fetch` / `git pull` / `git push` / `git ls-remote`は専用wrapperでGit process全体に1つの短命tokenを供給し、process終了時にbest-effortでrevoke
 - Git credential helperはwrapperが供給したprocess-local tokenだけを返し、`github.com`かつsession repositoryのHTTPS pathが一致する場合だけcredentialを供給
-- lower-precedenceのGit credential helperをresetし、`http.extraHeader`はglobal / github.com / session repository / `.git` URLで空値resetして既存Human Authorization headerへのfallbackを禁止
+- lower-precedenceのGit credential helperをresetし、authenticated Git operationのtoken発行前にeffective configを検査して任意のURL specificityにある`http.<url>.extraHeader=Authorization: ...`を拒否
 - GitHub SSH remoteをsession内だけHTTPSへrewriteし、Git SSH / askpassを無効化してSSH identityへのfallbackを禁止
 - App JWT / Installation Tokenを送るcurlはuser curl configを読み込まず、GitHub APIへのHTTPS通信だけを許可
 - App JWTで認証されたApp metadataからslugを取得
@@ -140,7 +141,7 @@ session内では次を自動設定します。
 
 local-onlyなGit commandはInstallation Tokenを発行せず、実際にremote認証が必要な上記commandだけをwrapper対象とします。credentialの保存可否、token lifecycle、private key compromise時の境界は[SECURITY.md](../SECURITY.md)を正本とします。
 
-`agent-github-auth`はGitHub.comだけを対象とします。GitHub Enterprise Server向けの保存済みcredentialや`GH_HOST`をApp sessionへ持ち込みません。
+`agent-github-auth`はGitHub.comだけを対象とします。GitHub Enterprise Server / Enterprise Cloud data-residency host向けのtargetやcredentialはApp sessionへ持ち込みません。別hostを明示した`gh` commandはtoken発行前に拒否します。
 
 GitHub Appの認証とInstallation Tokenの仕様はGitHub公式資料を参照してください。
 

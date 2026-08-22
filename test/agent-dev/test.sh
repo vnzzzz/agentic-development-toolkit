@@ -30,6 +30,13 @@ command -v agent-github-credential >/dev/null
 [[ -x /usr/local/lib/agent-dev/real-bin/git ]]
 agent-github-auth --help >/dev/null
 
+# shellcheck source=/dev/null
+source /usr/local/lib/agent-dev/github-auth-lib.sh
+agent_github_set_repo_full_name 'vnzzzz/example-repo'
+[[ $AGENT_GITHUB_REPO_OWNER == vnzzzz ]]
+[[ $AGENT_GITHUB_REPO_NAME == example-repo ]]
+[[ $AGENT_GITHUB_REPO_FULL_NAME == vnzzzz/example-repo ]]
+
 agent-github-auth configure claude 123456 >/dev/null
 config_path="$HOME/.config/agent-dev/github-apps/claude/config.json"
 [[ -f $config_path ]]

@@ -15,6 +15,72 @@ repository=${AGENT_GITHUB_REPOSITORY:-}
 [[ -n $repository ]] || agent_github_die 'AGENT_GITHUB_REPOSITORY is not set in authenticated GitHub App session'
 agent_github_set_repo_full_name "$repository"
 
+assert_github_com_url() {
+  local value=$1 host
+  case "$value" in
+    https://*|http://*|ssh://*)
+      host=${value#*://}
+      host=${host%%/*}
+      host=${host##*@}
+      host=${host%%:*}
+      [[ $host == github.com ]] || agent_github_die "GitHub App session refuses non-github.com target: $host"
+      ;;
+  esac
+}
+
+assert_github_com_repo_selector() {
+  local value=$1 host
+  assert_github_com_url "$value"
+
+  # gh -R/--repo accepts [HOST/]OWNER/REPO. If a host-like prefix is present,
+  # only github.com is allowed while the App Installation Token is in use.
+  if [[ $value == */*/* ]]; then
+    host=${value%%/*}
+    if [[ $host == *.* || $host == *:* ]]; then
+      [[ $host == github.com ]] || agent_github_die "GitHub App session refuses non-github.com repository host: $host"
+    fi
+  fi
+}
+
+assert_github_com_command_target() {
+  local -a args=("$@")
+  local i arg value
+
+  for ((i = 0; i < ${#args[@]}; i++)); do
+    arg=${args[$i]}
+    case "$arg" in
+      --hostname)
+        ((i + 1 < ${#args[@]})) || agent_github_die '--hostname requires a value'
+        value=${args[$((i + 1))]}
+        [[ $value == github.com ]] || agent_github_die "GitHub App session refuses non-github.com --hostname target: $value"
+        ((i += 1))
+        ;;
+      --hostname=*)
+        value=${arg#--hostname=}
+        [[ $value == github.com ]] || agent_github_die "GitHub App session refuses non-github.com --hostname target: $value"
+        ;;
+      -R|--repo)
+        ((i + 1 < ${#args[@]})) || agent_github_die "$arg requires a value"
+        assert_github_com_repo_selector "${args[$((i + 1))]}"
+        ((i += 1))
+        ;;
+      --repo=*)
+        assert_github_com_repo_selector "${arg#--repo=}"
+        ;;
+      https://*|http://*|ssh://*)
+        # Positional GitHub URLs can select a host for commands such as
+        # `gh pr view`. Reject non-github.com URLs before the token exists.
+        assert_github_com_url "$arg"
+        ;;
+    esac
+  done
+}
+
+# GH_TOKEN is also eligible for ghe.com hosts. Validate any explicit host/repo
+# selector before minting/exporting the Installation Token so command-line
+# options cannot override GH_HOST=github.com and redirect the token elsewhere.
+assert_github_com_command_target "$@"
+
 # Never expose the persistent Human gh config to an App-authenticated command.
 # A fresh config directory also prevents aliases/extensions/auth state written by
 # one wrapped invocation from leaking into the next one.

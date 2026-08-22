@@ -122,15 +122,16 @@ agent-github-auth codex -- codex
 session内では次を自動設定します。
 
 - current repository用のGitHub App Installation Tokenを必要時に発行
-- `gh`実行時に短命tokenを注入
-- Git HTTPS credential helperから`git fetch` / `git push`へ短命tokenを供給
+- `gh`実行時に短命tokenを注入し、command終了後にbest-effortでrevoke
+- `git fetch` / `git pull` / `git push` / `git ls-remote`は専用wrapperでGit process全体に1つの短命tokenを供給し、process終了後にbest-effortでrevoke
+- Git credential helperはwrapperが供給したprocess-local tokenだけを返し、`store` / `erase` callbackではrevokeしない
 - lower-precedenceのGit credential helperをリセットし、Human credentialへのfallbackを禁止
 - GitHub SSH remoteをsession内だけHTTPSへrewriteし、SSH identityへのfallbackを禁止
 - App JWTで認証されたApp metadataからslugを取得
 - Git Author / Committerを`{app-slug}[bot]`へ設定
 - bot user IDをGitHub APIから解決し、GitHub公式形式のnoreply emailを使用
 
-credentialの保存可否、token lifecycle、private key compromise時の境界は[SECURITY.md](../SECURITY.md)を正本とします。
+local-onlyなGit commandはInstallation Tokenを発行せず、実際にremote認証が必要な上記commandだけをwrapper対象とします。credentialの保存可否、token lifecycle、private key compromise時の境界は[SECURITY.md](../SECURITY.md)を正本とします。
 
 GitHub Appの認証とInstallation Tokenの仕様はGitHub公式資料を参照してください。
 

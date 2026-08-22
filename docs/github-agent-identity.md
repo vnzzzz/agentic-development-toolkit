@@ -73,7 +73,7 @@ private keyは利用者がbuild / rebuild後に配置します。
 ~/.config/agent-dev/github-apps/codex/private-key.pem
 ```
 
-private keyはmode `0600`、current user ownershipを必須とします。このpathのcredential lifecycleと永続化要件は[SECURITY.md](../SECURITY.md)を参照してください。
+private keyはmode `0600`、current user ownershipを必須とし、symlinkは拒否します。このpathのcredential lifecycleと永続化要件は[SECURITY.md](../SECURITY.md)を参照してください。
 
 GitHub App private keyの管理はGitHub公式資料を参照してください。
 
@@ -124,22 +124,27 @@ session開始時に`origin`からrepositoryを解決し、その`owner/repositor
 session内では次を自動設定します。
 
 - session開始時に選択したrepositoryだけを対象にGitHub App Installation Tokenを必要時に発行
-- `gh`実行時に短命tokenを注入し、command終了後にbest-effortでrevoke
-- `git fetch` / `git pull` / `git push` / `git ls-remote`は専用wrapperでGit process全体に1つの短命tokenを供給し、process終了後にbest-effortでrevoke
-- Git credential helperはwrapperが供給したprocess-local tokenだけを返し、`store` / `erase` callbackではrevokeしない
-- lower-precedenceのGit credential helperをリセットし、Human credentialへのfallbackを禁止
-- GitHub SSH remoteをsession内だけHTTPSへrewriteし、SSH identityへのfallbackを禁止
+- `gh`実行ごとに一時`GH_CONFIG_DIR`を作り、永続化されたHuman用GitHub CLI credential / alias / extension configを参照しない
+- `gh`のhostを`github.com`、default repositoryをsession repositoryへ固定し、Enterprise token環境変数とinteractive promptを無効化
+- `gh` command終了時にtokenをbest-effortでrevokeし、一時config directoryを削除
+- `git fetch` / `git pull` / `git push` / `git ls-remote`は専用wrapperでGit process全体に1つの短命tokenを供給し、process終了時にbest-effortでrevoke
+- Git credential helperはwrapperが供給したprocess-local tokenだけを返し、`github.com`かつsession repositoryのHTTPS pathが一致する場合だけcredentialを供給
+- lower-precedenceのGit credential helperと`http.extraHeader`をresetし、既存Human Authorization headerへのfallbackを禁止
+- GitHub SSH remoteをsession内だけHTTPSへrewriteし、Git SSH / askpassを無効化してSSH identityへのfallbackを禁止
 - App JWTで認証されたApp metadataからslugを取得
 - Git Author / Committerを`{app-slug}[bot]`へ設定
 - bot user IDをGitHub APIから解決し、GitHub公式形式のnoreply emailを使用
 
 local-onlyなGit commandはInstallation Tokenを発行せず、実際にremote認証が必要な上記commandだけをwrapper対象とします。credentialの保存可否、token lifecycle、private key compromise時の境界は[SECURITY.md](../SECURITY.md)を正本とします。
 
+`agent-github-auth`はGitHub.comだけを対象とします。GitHub Enterprise Server向けの保存済みcredentialや`GH_HOST`をApp sessionへ持ち込みません。
+
 GitHub Appの認証とInstallation Tokenの仕様はGitHub公式資料を参照してください。
 
 - [Authenticating as a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app)
 - [Generating an installation access token for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)
 - [REST API endpoints for GitHub Apps](https://docs.github.com/en/rest/apps/apps)
+- [GitHub CLI environment variables](https://cli.github.com/manual/gh_help_environment)
 
 ## Repository scope
 

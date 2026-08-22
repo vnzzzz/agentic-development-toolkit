@@ -15,22 +15,27 @@ repository=${AGENT_GITHUB_REPOSITORY:-}
 [[ -n $repository ]] || agent_github_die 'AGENT_GITHUB_REPOSITORY is not set in authenticated GitHub App session'
 agent_github_set_repo_full_name "$repository"
 
+git_global_args=()
 resolve_subcommand() {
-  local arg
+  local -a args=("$@")
+  local i arg
 
-  while [[ $# -gt 0 ]]; do
-    arg=$1
-    shift
+  for ((i = 0; i < ${#args[@]}; i++)); do
+    arg=${args[$i]}
     case "$arg" in
       -C|-c|--git-dir|--work-tree|--namespace|--config-env|--exec-path)
-        [[ $# -gt 0 ]] || agent_github_die "git global option requires a value: $arg"
-        shift
+        ((i + 1 < ${#args[@]})) || agent_github_die "git global option requires a value: $arg"
+        git_global_args+=("$arg" "${args[$((i + 1))]}")
+        ((i += 1))
         ;;
       --git-dir=*|--work-tree=*|--namespace=*|--config-env=*|--exec-path=*)
+        git_global_args+=("$arg")
         ;;
       --bare|--no-pager|--paginate|--literal-pathspecs|--no-literal-pathspecs|--glob-pathspecs|--noglob-pathspecs|--icase-pathspecs|--no-optional-locks)
+        git_global_args+=("$arg")
         ;;
       -*)
+        git_global_args+=("$arg")
         ;;
       *)
         printf '%s\n' "$arg"
@@ -42,9 +47,37 @@ resolve_subcommand() {
   return 1
 }
 
+assert_no_git_authorization_extraheader() {
+  local output status line value lower
+
+  # Query the effective configuration using the same global options (-C, -c,
+  # --config-env, --git-dir, ... ) that the wrapped invocation will use. This
+  # detects Authorization headers at any URL specificity, including service
+  # paths such as .../info/refs, instead of trying to out-specify every possible
+  # http.<url>.extraHeader key with more reset entries.
+  if output=$("$real_git" "${git_global_args[@]}" config --get-regexp '^[Hh][Tt][Tt][Pp]\..*\.[Ee][Xx][Tt][Rr][Aa][Hh][Ee][Aa][Dd][Ee][Rr]$' 2>/dev/null); then
+    while IFS= read -r line; do
+      value=${line#* }
+      lower=${value,,}
+      if [[ $lower =~ ^[[:space:]]*authorization[[:space:]]*: ]]; then
+        agent_github_die 'GitHub App session refuses configured Git HTTP Authorization extraHeader; remove it before authenticated Git operations'
+      fi
+    done <<<"$output"
+  else
+    status=$?
+    # git config exits 1 when no matching key exists. Any other failure means
+    # we cannot prove the effective HTTP authorization configuration is safe.
+    [[ $status -eq 1 ]] || agent_github_die 'cannot validate Git HTTP extraHeader configuration before authenticated operation'
+  fi
+}
+
 subcommand=$(resolve_subcommand "$@" || true)
 case "$subcommand" in
   fetch|pull|push|ls-remote)
+    # Validate before minting the token. This also catches caller-supplied -c or
+    # --config-env Authorization headers and repo/service-path-specific entries.
+    assert_no_git_authorization_extraheader
+
     token=
     cleanup() {
       unset AGENT_GITHUB_GIT_TOKEN

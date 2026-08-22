@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-AGENT_GITHUB_API_URL=${AGENT_GITHUB_API_URL:-https://api.github.com}
-AGENT_GITHUB_API_VERSION=${AGENT_GITHUB_API_VERSION:-2026-03-10}
-AGENT_GITHUB_REAL_GIT=${AGENT_GITHUB_REAL_GIT:-/usr/local/lib/agent-dev/real-bin/git}
+# agent-dev currently supports GitHub.com only. Do not inherit an API endpoint
+# from the caller: App JWTs and installation tokens must never be sent to an
+# arbitrary host through an environment override.
+AGENT_GITHUB_API_URL=https://api.github.com
+AGENT_GITHUB_API_VERSION=2026-03-10
+AGENT_GITHUB_REAL_GIT=/usr/local/lib/agent-dev/real-bin/git
 
 agent_github_die() {
   printf 'ERROR: %s\n' "$*" >&2
@@ -48,7 +51,7 @@ agent_github_validate_private_key() {
   local key_path=$1
   local mode owner_uid
 
-  [[ -f $key_path ]] || agent_github_die "GitHub App private key is missing: $key_path"
+  [[ -f $key_path && ! -L $key_path ]] || agent_github_die "GitHub App private key must be a regular non-symlink file: $key_path"
   mode=$(stat -c '%a' "$key_path")
   owner_uid=$(stat -c '%u' "$key_path")
   [[ $mode == 600 ]] || agent_github_die "private key must have mode 0600: $key_path (current: $mode)"
@@ -81,9 +84,6 @@ agent_github_current_repo() {
     https://github.com/*)
       path=${remote#https://github.com/}
       ;;
-    http://github.com/*)
-      path=${remote#http://github.com/}
-      ;;
     git@github.com:*)
       path=${remote#git@github.com:}
       ;;
@@ -91,7 +91,7 @@ agent_github_current_repo() {
       path=${remote#ssh://git@github.com/}
       ;;
     *)
-      agent_github_die "origin must be a github.com repository URL: $remote"
+      agent_github_die "origin must be an HTTPS or git@github.com GitHub.com repository URL: $remote"
       ;;
   esac
 

@@ -85,8 +85,10 @@ sessionでは次を保証します。
 - `gh` / `git push` / Git Author / Committerを同じApp bot identityへ揃える
 - Human `gh auth`、ambient GitHub token、既存Git credentialへfallbackしない
 - `github.com`以外の`gh` targetを拒否する
-- authenticated Git operationで別のAuthorization header / credential helperが有効ならfail closedする
+- authenticated Git operationで別のAuthorization header / credential helperやcredential埋め込みURLが有効ならfail closedする
 - GitHub SSH / interactive credential promptへfallbackしない
+
+App tokenを利用するGit commandはcanonicalな`fetch` / `pull` / `push` / `ls-remote`に限定します。Git aliasからnetwork operationを実行する形はサポートせず、canonical commandを使用します。
 
 実装上のcredential guardやprivate key compromise時の境界は[SECURITY.md](../SECURITY.md)を正本とします。
 

@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# shellcheck source=/dev/null
+source /usr/local/lib/agent-dev/github-auth-lib.sh
+
+usage() {
+  cat <<'EOF'
+Usage:
+  agent-github-auth configure <profile> <app-id>
+  agent-github-auth status <profile>
+  agent-github-auth <profile> [-- <command> [args...]]
+
+Examples:
+  agent-github-auth configure claude 123456
+  cp /path/to/private-key.pem ~/.config/agent-dev/github-apps/claude/private-key.pem
+  chmod 600 ~/.config/agent-dev/github-apps/claude/private-key.pem
+  agent-github-auth claude
+  agent-github-auth codex -- codex
+EOF
+}
+
+configure_profile() {
+  local profile=$1 app_id=$2 profile_dir config_path temp_path
+  local config_root apps_root dir
+  agent_github_validate_profile_name "$profile"
+  [[ $app_id =~ ^[0-9]+$ ]] || agent_github_die 'app-id must be numeric'
+
+  config_root=$HOME/.config/agent-dev
+  apps_root=$config_root/github-apps
+  profile_dir=$(agent_github_profile_dir "$profile")
+  config_path=$(agent_github_config_path "$profile")
+
+  # Validate the complete lexical path before mkdir so an existing symlink in
+  # any parent component cannot redirect credential creation outside $HOME.
+  agent_github_assert_no_symlink_components "$profile_dir"
+  for dir in "$config_root" "$apps_root" "$profile_dir"; do
+    mkdir -p "$dir"
+    agent_github_assert_no_symlink_components "$dir"
+    chmod 0700 "$dir"
+  done
+
+  temp_path=$(mktemp "$profile_dir/.config.XXXXXX")
+  jq -n --argjson app_id "$app_id" '{app_id:$app_id}' >"$temp_path"
+  chmod 0600 "$temp_path"
+  mv "$temp_path" "$config_path"
+  agent_github_validate_profile_storage "$profile"
+
+  printf 'Configured GitHub App profile: %s\n' "$profile"
+  printf 'Private key path: %s\n' "$(agent_github_key_path "$profile")"
+  printf 'The App slug and bot identity are derived from authenticated App metadata.\n'
+  printf 'Place the private key there and set mode 0600 before activation.\n'
+}
+
+status_profile() {
+  local profile=$1
+  local token repository
+
+  agent_github_load_profile "$profile"
+  agent_github_validate_private_key "$AGENT_GITHUB_KEY_PATH"
+  agent_github_current_repo
+  repository=$AGENT_GITHUB_REPO_FULL_NAME
+  agent_github_bot_identity "$profile"
+  token=$(agent_github_mint_token "$profile" "$repository")
+  if ! agent_github_revoke_token "$token" >/dev/null 2>&1; then
+    agent_github_die 'repository-scoped installation token was minted but could not be revoked'
+  fi
+
+  printf 'Profile: %s\n' "$profile"
+  printf 'App: %s (ID %s)\n' "$AGENT_GITHUB_APP_SLUG" "$AGENT_GITHUB_APP_ID"
+  printf 'Actor: %s <%s>\n' "$AGENT_GITHUB_BOT_LOGIN" "$AGENT_GITHUB_BOT_EMAIL"
+  printf 'Repository: %s\n' "$repository"
+  printf 'Private key: %s (validated, mode 0600)\n' "$AGENT_GITHUB_KEY_PATH"
+  printf 'Repository-scoped installation token: mint/revoke succeeded\n'
+}
+
+add_git_config() {
+  local config_key=$1 config_value=$2 index key_name value_name
+  index=${GIT_CONFIG_COUNT:-0}
+  key_name=GIT_CONFIG_KEY_${index}
+  value_name=GIT_CONFIG_VALUE_${index}
+  export "$key_name=$config_key"
+  export "$value_name=$config_value"
+  export GIT_CONFIG_COUNT=$((index + 1))
+}
+
+assert_exclusive_app_credentials() {
+  local real_gh=/usr/local/lib/agent-dev/real-bin/gh
+  local variable auth_json
+
+  # An App session must not coexist with a caller-provided GitHub token. Its
+  # provenance cannot be proven here, so refuse rather than silently shadow it.
+  for variable in GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN; do
+    if [[ -n ${!variable:-} ]]; then
+      agent_github_die "ambient GitHub credential is set in $variable; unset it before starting a GitHub App session"
+    fi
+  done
+
+  [[ -x $real_gh ]] || agent_github_die "real gh binary is unavailable: $real_gh"
+  if ! auth_json=$(env \
+    -u GH_TOKEN \
+    -u GITHUB_TOKEN \
+    -u GH_ENTERPRISE_TOKEN \
+    -u GITHUB_ENTERPRISE_TOKEN \
+    -u GH_HOST \
+    -u GH_REPO \
+    "$real_gh" auth status --json hosts 2>/dev/null); then
+    agent_github_die 'cannot verify persistent GitHub CLI authentication state before App session activation'
+  fi
+  jq -e '.hosts // {}' <<<"$auth_json" >/dev/null 2>&1 || \
+    agent_github_die 'cannot parse persistent GitHub CLI authentication state before App session activation'
+  if jq -e '(.hosts // {}) | length > 0' <<<"$auth_json" >/dev/null; then
+    agent_github_die 'stored GitHub CLI authentication is present; log out or use a Dev Container without Human gh credentials before starting a GitHub App session'
+  fi
+}
+
+activate_profile() {
+  local profile=$1
+  shift
+  local token shell_bin repository repo_http_url
+
+  # Enforce an exclusive App-authenticated identity before touching the App key.
+  assert_exclusive_app_credentials
+
+  agent_github_load_profile "$profile"
+  agent_github_validate_private_key "$AGENT_GITHUB_KEY_PATH"
+  agent_github_current_repo
+  repository=$AGENT_GITHUB_REPO_FULL_NAME
+  repo_http_url="https://github.com/${repository}"
+  agent_github_bot_identity "$profile"
+
+  # Freeze the repository selected at activation. Wrappers continue to mint
+  # tokens for this repository even if the interactive shell later changes cwd.
+  export AGENT_GITHUB_PROFILE=$profile
+  export AGENT_GITHUB_REPOSITORY=$repository
+
+  # Fail closed before entering the session if the App is not installed for the
+  # selected repository or a repository-scoped token cannot complete its lifecycle.
+  token=$(agent_github_mint_token "$profile" "$repository")
+  if ! agent_github_revoke_token "$token" >/dev/null 2>&1; then
+    agent_github_die 'preflight installation token was minted but could not be revoked'
+  fi
+
+  export AGENT_GITHUB_BOT_NAME=$AGENT_GITHUB_BOT_LOGIN
+  export AGENT_GITHUB_BOT_EMAIL
+  export PATH=/usr/local/lib/agent-dev/auth-bin:$PATH
+
+  # Remove inherited Git credential paths inside the App-authenticated session.
+  # The empty helper resets lower-precedence helpers before ours. Empty
+  # extraHeader values reset inherited Authorization headers. Repository-specific
+  # reset entries are required because Git URL matching prefers a more-specific
+  # http.<url>.extraHeader over host/global values.
+  add_git_config credential.helper ''
+  add_git_config credential.helper '!agent-github-credential'
+  add_git_config credential.useHttpPath true
+  add_git_config http.extraHeader ''
+  add_git_config http.https://github.com/.extraHeader ''
+  add_git_config "http.${repo_http_url}.extraHeader" ''
+  add_git_config "http.${repo_http_url}.git.extraHeader" ''
+  add_git_config user.name "$AGENT_GITHUB_BOT_LOGIN"
+  add_git_config user.email "$AGENT_GITHUB_BOT_EMAIL"
+  add_git_config url.https://github.com/.insteadOf git@github.com:
+  add_git_config url.https://github.com/.insteadOf ssh://git@github.com/
+
+  export GIT_AUTHOR_NAME=$AGENT_GITHUB_BOT_LOGIN
+  export GIT_AUTHOR_EMAIL=$AGENT_GITHUB_BOT_EMAIL
+  export GIT_COMMITTER_NAME=$AGENT_GITHUB_BOT_LOGIN
+  export GIT_COMMITTER_EMAIL=$AGENT_GITHUB_BOT_EMAIL
+  export GIT_TERMINAL_PROMPT=0
+  export GIT_ASKPASS=/bin/false
+  export GIT_SSH_COMMAND=/bin/false
+  export SSH_ASKPASS=/bin/false
+
+  # App-authenticated gh commands use an isolated temporary GH_CONFIG_DIR in
+  # auth-bin/gh. Clear inherited host/repository selectors here as well.
+  unset GH_HOST GH_REPO
+
+  printf 'GitHub App session: %s as %s for %s\n' \
+    "$profile" "$AGENT_GITHUB_BOT_LOGIN" "$repository"
+
+  if [[ ${1:-} == -- ]]; then
+    shift
+    [[ $# -gt 0 ]] || agent_github_die 'a command is required after --'
+    exec "$@"
+  fi
+  [[ $# -eq 0 ]] || agent_github_die 'unexpected arguments; use -- before a command'
+
+  shell_bin=${SHELL:-/bin/bash}
+  exec "$shell_bin" -i
+}
+
+case ${1:-} in
+  configure)
+    [[ $# -eq 3 ]] || {
+      usage >&2
+      exit 2
+    }
+    configure_profile "$2" "$3"
+    ;;
+  status)
+    [[ $# -eq 2 ]] || {
+      usage >&2
+      exit 2
+    }
+    status_profile "$2"
+    ;;
+  -h|--help|help|'')
+    usage
+    ;;
+  *)
+    profile=$1
+    shift
+    activate_profile "$profile" "$@"
+    ;;
+esac

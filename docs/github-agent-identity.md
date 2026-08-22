@@ -119,6 +119,8 @@ agent-github-auth claude -- claude
 agent-github-auth codex -- codex
 ```
 
+session activationはApp credentialの排他利用をpreflightします。`GH_TOKEN` / `GITHUB_TOKEN` / `GH_ENTERPRISE_TOKEN` / `GITHUB_ENTERPRISE_TOKEN`が既に設定されている場合、または永続`gh auth`設定に既知のaccountが存在する場合はsessionを開始しません。credentialの出所を推測してshadowするのではなくfail closedします。Humanとして`gh`を使う環境とAgent App sessionを同時に成立させないことが前提です。
+
 session開始時に`origin`からrepositoryを解決し、その`owner/repository`をsessionの認証対象として固定します。session中に別directoryへ`cd`してもtoken scopeは変更しません。`git -C`や`gh -R`などで別repositoryを指定しても、そのrepository用tokenを追加発行せず、認証対象外の操作はfail closedします。
 
 session内では次を自動設定します。
@@ -145,6 +147,7 @@ GitHub Appの認証とInstallation Tokenの仕様はGitHub公式資料を参照�
 - [Generating an installation access token for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)
 - [REST API endpoints for GitHub Apps](https://docs.github.com/en/rest/apps/apps)
 - [GitHub CLI environment variables](https://cli.github.com/manual/gh_help_environment)
+- [GitHub CLI authentication status](https://cli.github.com/manual/gh_auth_status)
 
 ## Repository scope
 

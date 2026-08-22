@@ -119,9 +119,11 @@ agent-github-auth claude -- claude
 agent-github-auth codex -- codex
 ```
 
+session開始時に`origin`からrepositoryを解決し、その`owner/repository`をsessionの認証対象として固定します。session中に別directoryへ`cd`してもtoken scopeは変更しません。`git -C`や`gh -R`などで別repositoryを指定しても、そのrepository用tokenを追加発行せず、認証対象外の操作はfail closedします。
+
 session内では次を自動設定します。
 
-- current repository用のGitHub App Installation Tokenを必要時に発行
+- session開始時に選択したrepositoryだけを対象にGitHub App Installation Tokenを必要時に発行
 - `gh`実行時に短命tokenを注入し、command終了後にbest-effortでrevoke
 - `git fetch` / `git pull` / `git push` / `git ls-remote`は専用wrapperでGit process全体に1つの短命tokenを供給し、process終了後にbest-effortでrevoke
 - Git credential helperはwrapperが供給したprocess-local tokenだけを返し、`store` / `erase` callbackではrevokeしない
@@ -141,13 +143,16 @@ GitHub Appの認証とInstallation Tokenの仕様はGitHub公式資料を参照�
 
 ## Repository scope
 
-runtimeではGit remoteの`origin`からcurrent repositoryを解決し、そのrepository名を指定してInstallation Tokenを発行します。
+runtimeではsession activation時のGit remote `origin`からrepositoryを解決し、そのrepository名をsessionの認証対象として固定してInstallation Tokenを発行します。
 
 ```text
-Git remote origin
+Git remote origin at activation
   -> owner/repository
+  -> freeze as session repository
   -> repository-scoped Installation Token
 ```
+
+repository選択を各wrapperのcurrent working directoryから再計算しないため、session中の`cd`や`git -C`で意図せずtoken scopeが変わることはありません。別repositoryを操作する場合は、そのrepositoryで新しい`agent-github-auth` sessionを開始します。
 
 このruntime behaviorとGitHub App installation scopeの関係、保証範囲は[SECURITY.md](../SECURITY.md)を参照してください。
 

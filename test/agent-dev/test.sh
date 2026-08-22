@@ -106,11 +106,12 @@ unset AGENT_GITHUB_PROFILE AGENT_GITHUB_REPOSITORY AGENT_GITHUB_GIT_TOKEN
 
 # Keep these invariants visible in the installed wrappers. Live token behavior is
 # covered by the merge-precondition E2E in Issue #32.
-grep -q 'GH_CONFIG_DIR="$config_dir"' /usr/local/lib/agent-dev/auth-bin/gh
-grep -q 'GH_HOST=github.com' /usr/local/lib/agent-dev/auth-bin/gh
-grep -q 'GH_REPO="$repository"' /usr/local/lib/agent-dev/auth-bin/gh
-grep -q 'GH_PROMPT_DISABLED=1' /usr/local/lib/agent-dev/auth-bin/gh
-grep -q 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/gh
-grep -q 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/git
+grep -Fq 'config_dir=$(mktemp -d' /usr/local/lib/agent-dev/auth-bin/gh
+grep -Fq 'GH_CONFIG_DIR=' /usr/local/lib/agent-dev/auth-bin/gh
+grep -Fq 'GH_HOST=github.com' /usr/local/lib/agent-dev/auth-bin/gh
+grep -Fq 'GH_REPO=' /usr/local/lib/agent-dev/auth-bin/gh
+grep -Fq 'GH_PROMPT_DISABLED=1' /usr/local/lib/agent-dev/auth-bin/gh
+grep -Fq 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/gh
+grep -Fq 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/git
 
 printf 'agent-dev Feature validation passed.\n'

@@ -48,9 +48,9 @@ Claude / CodexからGitHubへwriteする場合は、Agentごとの専用GitHub A
 
 App sessionはcredential sourceを排他的にします。`GH_TOKEN` / `GITHUB_TOKEN` / Enterprise token環境変数が既に設定されている場合、または永続`gh auth`設定に既知のaccountが存在する場合はsessionを開始しません。Human credentialをshadowして継続するのではなくfail closedします。
 
-App-authenticated `gh`は永続化されたHuman用`GH_CONFIG_DIR`を参照せず、commandごとの一時config directoryを使用します。hostは`github.com`、default repositoryはactivation時のrepositoryに固定し、Enterprise用token環境変数とinteractive promptを無効化します。
+App-authenticated `gh`は永続化されたHuman用`GH_CONFIG_DIR`を参照せず、commandごとの一時config directoryを使用します。hostは`github.com`、default repositoryはactivation時のrepositoryに固定し、Enterprise用token環境変数とinteractive promptを無効化します。`GH_TOKEN`は`ghe.com`系hostにも利用され得るため、`--hostname`、`-R` / `--repo`、positional GitHub URLなどで明示されたtargetをtoken発行前に検査し、`github.com`以外を拒否します。
 
-Gitはsession内でlower-precedence credential helperをresetし、`credential.useHttpPath`でactivation時repositoryのpath一致を要求します。`http.extraHeader`はglobal / github.com / activation repository / `.git` URLの各scopeで空値resetし、より具体的なHuman Authorization headerへfallbackしないようにします。GitHub接続では`GIT_SSH_COMMAND`とaskpassも無効化します。
+Gitはsession内でlower-precedence credential helperをresetし、`credential.useHttpPath`でactivation時repositoryのpath一致を要求します。GitHub接続では`GIT_SSH_COMMAND`とaskpassも無効化します。さらにauthenticated Git operationのtoken発行前に、そのinvocationと同じ`-C` / `-c` / `--config-env`等を反映したeffective Git configを検査し、任意のURL specificityにある`http.<url>.extraHeader=Authorization: ...`を検出した場合は拒否します。service path固有の設定を含め、より具体的なHuman Authorization headerへfallbackしません。
 
 GitHub App API通信は`https://api.github.com`へ固定し、plain HTTP originを拒否します。credential-bearing HTTP requestは共通curl helperを通し、`curl -q`を先頭optionとしてuser `~/.curlrc`および`CURL_HOME`で選択されたcurl configを読み込みません。HTTPS以外のprotocolも許可しません。
 

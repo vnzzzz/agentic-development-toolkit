@@ -4,7 +4,7 @@ set -Eeuo pipefail
 # shellcheck source=/dev/null
 source /usr/local/lib/agent-dev/github-auth-lib.sh
 
-real_git=${AGENT_GITHUB_REAL_GIT:-/usr/local/lib/agent-dev/real-bin/git}
+real_git=/usr/local/lib/agent-dev/real-bin/git
 [[ -x $real_git ]] || agent_github_die "real git binary is unavailable: $real_git"
 
 profile=${AGENT_GITHUB_PROFILE:-}
@@ -13,6 +13,7 @@ if [[ -z $profile ]]; then
 fi
 repository=${AGENT_GITHUB_REPOSITORY:-}
 [[ -n $repository ]] || agent_github_die 'AGENT_GITHUB_REPOSITORY is not set in authenticated GitHub App session'
+agent_github_set_repo_full_name "$repository"
 
 resolve_subcommand() {
   local arg
@@ -44,6 +45,16 @@ resolve_subcommand() {
 subcommand=$(resolve_subcommand "$@" || true)
 case "$subcommand" in
   fetch|pull|push|ls-remote)
+    token=
+    cleanup() {
+      unset AGENT_GITHUB_GIT_TOKEN
+      if [[ -n $token ]]; then
+        agent_github_revoke_token "$token" >/dev/null 2>&1 || true
+        token=
+      fi
+    }
+    trap cleanup EXIT
+
     token=$(agent_github_mint_token "$profile" "$repository")
     export AGENT_GITHUB_GIT_TOKEN=$token
 
@@ -52,8 +63,8 @@ case "$subcommand" in
     status=$?
     set -e
 
-    unset AGENT_GITHUB_GIT_TOKEN
-    agent_github_revoke_token "$token" >/dev/null 2>&1 || true
+    trap - EXIT
+    cleanup
     exit "$status"
     ;;
   *)

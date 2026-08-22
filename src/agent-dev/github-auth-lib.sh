@@ -34,12 +34,49 @@ agent_github_key_path() {
   printf '%s/private-key.pem\n' "$(agent_github_profile_dir "$profile")"
 }
 
+agent_github_assert_no_symlink_components() {
+  local path=$1 current
+
+  [[ $path == /* ]] || agent_github_die "credential path must be absolute: $path"
+  current=$path
+  while [[ $current != / ]]; do
+    [[ ! -L $current ]] || agent_github_die "GitHub App credential path must not contain symlinks: $current"
+    current=$(dirname "$current")
+  done
+}
+
+agent_github_validate_profile_storage() {
+  local profile=$1 config_root apps_root profile_dir config_path dir mode owner_uid
+
+  config_root=$HOME/.config/agent-dev
+  apps_root=$config_root/github-apps
+  profile_dir=$(agent_github_profile_dir "$profile")
+  config_path=$(agent_github_config_path "$profile")
+
+  agent_github_assert_no_symlink_components "$config_path"
+  for dir in "$config_root" "$apps_root" "$profile_dir"; do
+    [[ -d $dir ]] || agent_github_die "GitHub App credential directory is missing: $dir"
+    mode=$(stat -c '%a' "$dir")
+    owner_uid=$(stat -c '%u' "$dir")
+    [[ $mode == 700 ]] || agent_github_die "GitHub App credential directory must have mode 0700: $dir (current: $mode)"
+    [[ $owner_uid == "$(id -u)" ]] || agent_github_die "GitHub App credential directory must be owned by the current user: $dir"
+  done
+
+  [[ -f $config_path ]] || agent_github_die "GitHub App profile config is missing: $config_path"
+  mode=$(stat -c '%a' "$config_path")
+  owner_uid=$(stat -c '%u' "$config_path")
+  [[ $mode == 600 ]] || agent_github_die "GitHub App profile config must have mode 0600: $config_path (current: $mode)"
+  [[ $owner_uid == "$(id -u)" ]] || agent_github_die "GitHub App profile config must be owned by the current user: $config_path"
+}
+
 agent_github_load_profile() {
   local profile=$1
   local config_path
+
+  agent_github_validate_profile_name "$profile"
+  agent_github_validate_profile_storage "$profile"
   config_path=$(agent_github_config_path "$profile")
 
-  [[ -f $config_path ]] || agent_github_die "GitHub App profile is not configured: $profile (expected $config_path)"
   jq -e . "$config_path" >/dev/null 2>&1 || agent_github_die "invalid JSON config: $config_path"
 
   AGENT_GITHUB_APP_ID=$(jq -er '.app_id | tostring | select(test("^[0-9]+$"))' "$config_path") || \
@@ -51,7 +88,8 @@ agent_github_validate_private_key() {
   local key_path=$1
   local mode owner_uid
 
-  [[ -f $key_path && ! -L $key_path ]] || agent_github_die "GitHub App private key must be a regular non-symlink file: $key_path"
+  agent_github_assert_no_symlink_components "$key_path"
+  [[ -f $key_path ]] || agent_github_die "GitHub App private key must be a regular file: $key_path"
   mode=$(stat -c '%a' "$key_path")
   owner_uid=$(stat -c '%u' "$key_path")
   [[ $mode == 600 ]] || agent_github_die "private key must have mode 0600: $key_path (current: $mode)"
@@ -121,11 +159,17 @@ agent_github_jwt() {
   printf '%s.%s\n' "$unsigned" "$signature"
 }
 
+agent_github_curl() {
+  # -q must be curl's first option so ~/.curlrc and CURL_HOME-selected config are
+  # never loaded for requests that carry App JWTs or Installation Tokens.
+  command curl -q --proto '=https' --proto-redir '=https' "$@"
+}
+
 agent_github_installation_id() {
   local jwt=$1 owner=$2 repo=$3
   local response installation_id
 
-  response=$(curl --fail-with-body --silent --show-error \
+  response=$(agent_github_curl --fail-with-body --silent --show-error \
     -H 'Accept: application/vnd.github+json' \
     -H "Authorization: Bearer $jwt" \
     -H "X-GitHub-Api-Version: $AGENT_GITHUB_API_VERSION" \
@@ -147,7 +191,7 @@ agent_github_mint_token() {
   jwt=$(agent_github_jwt "$AGENT_GITHUB_APP_ID" "$AGENT_GITHUB_KEY_PATH")
   installation_id=$(agent_github_installation_id "$jwt" "$AGENT_GITHUB_REPO_OWNER" "$AGENT_GITHUB_REPO_NAME")
   request=$(jq -cn --arg repo "$AGENT_GITHUB_REPO_NAME" '{repositories:[$repo]}')
-  response=$(curl --fail-with-body --silent --show-error \
+  response=$(agent_github_curl --fail-with-body --silent --show-error \
     -X POST \
     -H 'Accept: application/vnd.github+json' \
     -H "Authorization: Bearer $jwt" \
@@ -162,7 +206,7 @@ agent_github_mint_token() {
 
 agent_github_revoke_token() {
   local token=$1
-  curl --fail --silent --show-error \
+  agent_github_curl --fail --silent --show-error \
     -X DELETE \
     -H 'Accept: application/vnd.github+json' \
     -H "Authorization: Bearer $token" \
@@ -177,7 +221,7 @@ agent_github_bot_identity() {
   agent_github_validate_private_key "$AGENT_GITHUB_KEY_PATH"
 
   jwt=$(agent_github_jwt "$AGENT_GITHUB_APP_ID" "$AGENT_GITHUB_KEY_PATH")
-  app_response=$(curl --fail-with-body --silent --show-error \
+  app_response=$(agent_github_curl --fail-with-body --silent --show-error \
     -H 'Accept: application/vnd.github+json' \
     -H "Authorization: Bearer $jwt" \
     -H "X-GitHub-Api-Version: $AGENT_GITHUB_API_VERSION" \
@@ -190,7 +234,7 @@ agent_github_bot_identity() {
   app_slug=$(jq -er '.slug | strings | select(test("^[A-Za-z0-9-]+$"))' <<<"$app_response") || \
     agent_github_die 'authenticated App response did not contain a valid slug'
 
-  user_response=$(curl --fail-with-body --silent --show-error \
+  user_response=$(agent_github_curl --fail-with-body --silent --show-error \
     -H 'Accept: application/vnd.github+json' \
     -H "X-GitHub-Api-Version: $AGENT_GITHUB_API_VERSION" \
     "$AGENT_GITHUB_API_URL/users/${app_slug}%5Bbot%5D") || \

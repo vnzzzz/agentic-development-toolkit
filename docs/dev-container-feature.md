@@ -44,8 +44,8 @@ consumer repositoryは自身をVS Code workspace / Git rootとして直接開き
    ```
 
 2. Dev Containerをbuildし、生成された`.devcontainer-lock.json`をcommitします。
-3. 必要に応じてClaude Code、Codex、GitHub CLIへloginします。
-4. Agent専用GitHub Appを使用する場合は[GitHub Agent identity](github-agent-identity.md)に従ってprofileとprivate keyを設定します。
+3. 必要に応じてClaude Code / Codexへloginします。HumanとしてGitHub CLIを利用する場合の`gh auth login`はAgent App sessionとは分離して扱います。
+4. Agent専用GitHub Appを使用する場合は、ambient GitHub tokenをunsetし、永続`gh auth` accountがない状態で[GitHub Agent identity](github-agent-identity.md)に従ってprofileとprivate keyを設定します。`agent-github-auth`はHuman `gh`認証との共存を拒否します。
 5. project固有runtimeやserviceはconsumer側のDev Container設定へ追加します。
 
 `agent-dev:1`のようにmajor versionを指定しても、lockfileが実際に解決したFeature versionとdigestを固定します。GHCR側の`1` tagが更新されても、lockfileを更新するまで既存projectのbuildは同じartifactを利用します。
@@ -83,7 +83,9 @@ agent-github-auth claude
 agent-github-auth codex -- codex
 ```
 
-session内では`gh`がcommandごとにrepo-scoped Installation Tokenを利用し、`git fetch` / `pull` / `push` / `ls-remote`はGit process全体で1つのtokenを利用して終了後にbest-effortでrevokeします。Git Author / Committerも同じApp botへ設定され、Human GitHub credentialへのfallbackは行いません。
+App session開始時には`GH_TOKEN` / `GITHUB_TOKEN`等のambient tokenと、`gh auth`に保存された既存accountがないことを検証します。どちらかが存在する場合は、credentialの出所を推測してshadowするのではなくfail closedします。
+
+session内では`gh`がcommandごとの一時`GH_CONFIG_DIR`とrepo-scoped Installation Tokenを利用します。`git fetch` / `pull` / `push` / `ls-remote`はGit process全体で1つのtokenを利用して終了後にbest-effortでrevokeします。Git Author / Committerも同じApp botへ設定され、Human GitHub credentialへのfallbackは行いません。
 
 private keyはnamed volumeへ保存せず、Dev Container rebuildで消えます。詳細なpermissions、credential lifecycle、repository scope、Ruleset要件は[GitHub Agent identity](github-agent-identity.md)を参照し、trust boundaryは[SECURITY.md](../SECURITY.md)を正本とします。
 

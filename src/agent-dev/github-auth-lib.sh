@@ -174,7 +174,7 @@ agent_github_bot_identity() {
   bot_id=$(jq -er '.id' <<<"$response") || agent_github_die "bot user response did not contain an id"
   bot_login=$(jq -er '.login' <<<"$response") || agent_github_die "bot user response did not contain a login"
 
-  AGENT_GITHUB_BOT_ID=$bot_id
-  AGENT_GITHUB_BOT_LOGIN=$bot_login
-  AGENT_GITHUB_BOT_EMAIL=${bot_id}+${bot_login}@users.noreply.github.com
+  export AGENT_GITHUB_BOT_ID=$bot_id
+  export AGENT_GITHUB_BOT_LOGIN=$bot_login
+  export AGENT_GITHUB_BOT_EMAIL=${bot_id}+${bot_login}@users.noreply.github.com
 }

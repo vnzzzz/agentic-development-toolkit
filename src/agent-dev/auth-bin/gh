@@ -42,7 +42,18 @@ assert_github_com_repo_selector() {
 
 assert_github_com_command_target() {
   local -a args=("$@")
-  local i arg value
+  local i arg value auth_hostname_short=0
+
+  if [[ ${args[0]:-} == auth ]]; then
+    case ${args[1]:-} in
+      login|logout|refresh|status|switch|token)
+        auth_hostname_short=1
+        ;;
+    esac
+    # Returning the process-local Installation Token defeats the wrapper's
+    # non-persistence model and is not needed by the supported workflow.
+    [[ ${args[1]:-} != token ]] || agent_github_die 'gh auth token is disabled in GitHub App session'
+  fi
 
   for ((i = 0; i < ${#args[@]}; i++)); do
     arg=${args[$i]}
@@ -56,6 +67,21 @@ assert_github_com_command_target() {
       --hostname=*)
         value=${arg#--hostname=}
         [[ $value == github.com ]] || agent_github_die "GitHub App session refuses non-github.com --hostname target: $value"
+        ;;
+      -h)
+        if ((auth_hostname_short)); then
+          ((i + 1 < ${#args[@]})) || agent_github_die '-h requires a hostname value for this gh auth command'
+          value=${args[$((i + 1))]}
+          [[ $value == github.com ]] || agent_github_die "GitHub App session refuses non-github.com -h target: $value"
+          ((i += 1))
+        fi
+        ;;
+      -h?*)
+        if ((auth_hostname_short)); then
+          value=${arg#-h}
+          value=${value#=}
+          [[ $value == github.com ]] || agent_github_die "GitHub App session refuses non-github.com -h target: $value"
+        fi
         ;;
       -R|--repo)
         ((i + 1 < ${#args[@]})) || agent_github_die "$arg requires a value"
@@ -76,8 +102,6 @@ assert_github_com_command_target() {
     esac
   done
 
-  # Some `gh repo` commands accept [HOST/]OWNER/REPO positionally rather than
-  # through -R. Reject a host-like three-segment argument before token issuance.
   if [[ ${args[0]:-} == repo ]]; then
     case ${args[1]:-} in
       archive|clone|delete|edit|fork|set-default|sync|unarchive|view)

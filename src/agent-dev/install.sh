@@ -100,6 +100,7 @@ install -m 0644 "$SCRIPT_DIR/github-auth-lib.sh" /usr/local/lib/agent-dev/github
 install -m 0755 "$SCRIPT_DIR/agent-github-auth" /usr/local/bin/agent-github-auth
 install -m 0755 "$SCRIPT_DIR/agent-github-credential" /usr/local/bin/agent-github-credential
 install -m 0755 "$SCRIPT_DIR/auth-bin/gh" /usr/local/lib/agent-dev/auth-bin/gh
+install -m 0755 "$SCRIPT_DIR/auth-bin/git" /usr/local/lib/agent-dev/auth-bin/git
 
 printf '%s\n' "$claude_version_output"
 printf '%s\n' "$codex_version_output"

@@ -13,12 +13,40 @@ if [[ -z $profile ]]; then
 fi
 repository=${AGENT_GITHUB_REPOSITORY:-}
 [[ -n $repository ]] || agent_github_die 'AGENT_GITHUB_REPOSITORY is not set in authenticated GitHub App session'
+agent_github_set_repo_full_name "$repository"
+
+# Never expose the persistent Human gh config to an App-authenticated command.
+# A fresh config directory also prevents aliases/extensions/auth state written by
+# one wrapped invocation from leaking into the next one.
+config_dir=$(mktemp -d "${TMPDIR:-/tmp}/agent-github-gh.XXXXXX")
+chmod 0700 "$config_dir"
+token=
+cleanup() {
+  if [[ -n $token ]]; then
+    agent_github_revoke_token "$token" >/dev/null 2>&1 || true
+    token=
+  fi
+  rm -rf "$config_dir"
+}
+trap cleanup EXIT
 
 token=$(agent_github_mint_token "$profile" "$repository")
 set +e
-env -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_ENTERPRISE_TOKEN \
-  GH_TOKEN="$token" "$real_gh" "$@"
+env \
+  -u GITHUB_TOKEN \
+  -u GH_ENTERPRISE_TOKEN \
+  -u GITHUB_ENTERPRISE_TOKEN \
+  -u GH_DEBUG \
+  -u DEBUG \
+  GH_TOKEN="$token" \
+  GH_HOST=github.com \
+  GH_REPO="$repository" \
+  GH_CONFIG_DIR="$config_dir" \
+  GH_PROMPT_DISABLED=1 \
+  "$real_gh" "$@"
 status=$?
 set -e
-agent_github_revoke_token "$token" >/dev/null 2>&1 || true
+
+trap - EXIT
+cleanup
 exit "$status"

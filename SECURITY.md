@@ -42,13 +42,19 @@ Claude / CodexからGitHubへwriteする場合は、Agentごとの専用GitHub A
 ~/.config/agent-dev/github-apps/<profile>/private-key.pem
 ```
 
-このpathはnamed volumeではありません。private keyはDev Container rebuildで消えることを仕様とし、workspaceやGit管理対象へ退避しません。mode `0600`かつcurrent user ownershipを必須とします。
+このpathはnamed volumeではありません。private keyはDev Container rebuildで消えることを仕様とし、workspaceやGit管理対象へ退避しません。mode `0600`かつcurrent user ownershipを必須とし、symlinkは拒否します。
 
-認証sessionではcurrent repositoryだけにscopeした短命Installation Tokenを必要時に発行し、`gh` / Git HTTPS credentialへ供給します。tokenはdisk、named volume、`gh auth` credential storeへ保存しません。Human credentialへfallbackしないよう、Git credential helperとSSH remoteをsession内で明示的に制御します。
+認証sessionではactivation時のrepositoryだけにscopeした短命Installation Tokenを必要時に発行し、`gh` / Git HTTPS credentialへ供給します。tokenはdisk、named volume、`gh auth` credential storeへ保存しません。
 
-private keyへAgent processがアクセスできるため、private key compromise時の最終的なrepository blast radiusはGitHub App installation scopeです。runtime tokenのrepository scopeはdefense-in-depthであり、installation scopeの代替ではありません。
+Human credentialへのfallbackを避けるため、App-authenticated `gh`は永続化されたHuman用`GH_CONFIG_DIR`を参照せず、commandごとの一時config directoryを使用します。hostは`github.com`、default repositoryはactivation時のrepositoryに固定し、Enterprise用token環境変数とinteractive promptを無効化します。
 
-GitHub Agent identityのpermissions、利用方法、Ruleset前提は[GitHub Agent identity](docs/github-agent-identity.md)を正本とします。
+Gitはsession内でlower-precedence credential helperをresetし、`credential.useHttpPath`でactivation時repositoryのpath一致を要求します。lower-precedenceの`http.extraHeader`も空値でresetし、GitHub接続でSSH credentialへfallbackしないよう`GIT_SSH_COMMAND`とaskpassを無効化します。
+
+これらはHuman credentialを誤利用しないためのworkflow guardです。認証済みcontainer内のAgent processはprivate keyを読めるため、同一user processを敵対的にsandboxする機構ではありません。private key compromise時の最終的なrepository blast radiusはGitHub App installation scopeです。runtime tokenのrepository scopeはdefense-in-depthであり、installation scopeの代替ではありません。
+
+`agent-github-auth`はGitHub.comのみを対象とし、App JWT / Installation Token発行先APIを利用者環境変数から変更しません。
+
+GitHub Agent identityのpermissions、利用方法、Ruleset前提は[GitHub Agent identity](docs/github-agent-identity.md)を参照してください。
 
 Docker daemonを操作できる主体はcontainerやnamed volumeの境界を越えられます。Docker socketをAgent Containerへmountしない現行方針を維持します。
 

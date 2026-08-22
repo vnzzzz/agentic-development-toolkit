@@ -16,6 +16,7 @@ repository=${AGENT_GITHUB_REPOSITORY:-}
 agent_github_set_repo_full_name "$repository"
 
 git_global_args=()
+subcommand=
 resolve_subcommand() {
   local -a args=("$@")
   local i arg
@@ -38,13 +39,11 @@ resolve_subcommand() {
         git_global_args+=("$arg")
         ;;
       *)
-        printf '%s\n' "$arg"
+        subcommand=$arg
         return 0
         ;;
     esac
   done
-
-  return 1
 }
 
 assert_safe_git_credentials() {
@@ -76,7 +75,7 @@ assert_safe_git_credentials() {
   fi
 }
 
-subcommand=$(resolve_subcommand "$@" || true)
+resolve_subcommand "$@"
 case "$subcommand" in
   fetch|pull|push|ls-remote)
     assert_safe_git_credentials

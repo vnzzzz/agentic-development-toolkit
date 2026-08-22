@@ -13,6 +13,7 @@ consumer repositoryは自身をVS Code workspace / Git rootとして直接開き
 - versionを固定したClaude Code / Codex CLI
 - `git`、`jq`、`make`、`shellcheck`、`unzip`、`zip`などの共通CLI
 - Claude Code / Codex / GitHub CLIの認証状態を保持するnamed volume
+- GitHub App bot identityで`gh` / `git`を実行する`agent-github-auth`
 - Claude Code / CodexのVS Code extension
 - container作成後のpublic `vnzzzz/agent-skills` Plugin bootstrap
 
@@ -25,6 +26,7 @@ consumer repositoryは自身をVS Code workspace / Git rootとして直接開き
 - database、service、port
 - project固有dependency
 - project固有VS Code extension / setting
+- GitHub Appの作成、repository installation scope、permissions、private key管理
 
 ## Consumer workflow
 
@@ -43,13 +45,47 @@ consumer repositoryは自身をVS Code workspace / Git rootとして直接開き
 
 2. Dev Containerをbuildし、生成された`.devcontainer-lock.json`をcommitします。
 3. 必要に応じてClaude Code、Codex、GitHub CLIへloginします。
-4. project固有runtimeやserviceはconsumer側のDev Container設定へ追加します。
+4. Agent専用GitHub Appを使用する場合は[GitHub Agent identity](github-agent-identity.md)に従ってprofileとprivate keyを設定します。
+5. project固有runtimeやserviceはconsumer側のDev Container設定へ追加します。
 
 `agent-dev:1`のようにmajor versionを指定しても、lockfileが実際に解決したFeature versionとdigestを固定します。GHCR側の`1` tagが更新されても、lockfileを更新するまで既存projectのbuildは同じartifactを利用します。
 
 ## Security
 
 credential、named volume、host mount、trusted repositoryに関する要件とtrust boundaryは[SECURITY.md](../SECURITY.md)を正本とします。`agent-dev`を利用する前に同文書を確認してください。
+
+## GitHub Agent identity
+
+FeatureはPATH上に`agent-github-auth`を提供します。profile metadataの設定例:
+
+```bash
+agent-github-auth configure claude <APP_ID> <APP_SLUG>
+agent-github-auth configure codex <APP_ID> <APP_SLUG>
+```
+
+GitHub App private keyはbuild後に次へ配置し、mode `0600`にします。
+
+```text
+~/.config/agent-dev/github-apps/claude/private-key.pem
+~/.config/agent-dev/github-apps/codex/private-key.pem
+```
+
+確認:
+
+```bash
+agent-github-auth status claude
+```
+
+Agent session:
+
+```bash
+agent-github-auth claude
+agent-github-auth codex -- codex
+```
+
+session内では`gh`とGit HTTPS credentialがGitHub Appのrepo-scoped Installation Tokenを必要時に取得し、Git Author / Committerも同じApp botへ設定されます。Human GitHub credentialへのfallbackは行いません。
+
+private keyはnamed volumeへ保存せず、Dev Container rebuildで消えます。詳細なpermissions、credential lifecycle、repository scope、Ruleset要件は[GitHub Agent identity](github-agent-identity.md)を正本とします。
 
 ## Versioning
 
@@ -135,7 +171,7 @@ make test
 - shell syntax / ShellCheck
 - release version guardの分岐
 
-`make test`はさらに`devcontainer features test`で編集中のFeature sourceを別containerへ導入し、Agent CLI、`agent-skills` Plugin bootstrap、認証volumeの書き込み可能性を確認します。
+`make test`はさらに`devcontainer features test`で編集中のFeature sourceを別containerへ導入し、Agent CLI、`agent-skills` Plugin bootstrap、認証volume、GitHub App auth toolingの導入とfail-closed behaviorを確認します。
 
 新しいFeature versionをreleaseした後、このrepository自身でも採用する場合は別changeとして`devcontainer upgrade`を実行し、`.devcontainer-lock.json`の差分をreviewします。未公開versionへself-hosting lockfileを先行更新しません。
 
@@ -143,4 +179,5 @@ make test
 
 - repositoryの入口: [README.md](../README.md)
 - trust boundaryとcredential: [SECURITY.md](../SECURITY.md)
+- GitHub Agent identity: [github-agent-identity.md](github-agent-identity.md)
 - repository変更時の制約: [AGENTS.md](../AGENTS.md)

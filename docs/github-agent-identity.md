@@ -73,7 +73,7 @@ private keyは利用者がbuild / rebuild後に配置します。
 ~/.config/agent-dev/github-apps/codex/private-key.pem
 ```
 
-private keyはmode `0600`、current user ownershipを必須とし、symlinkは拒否します。このpathのcredential lifecycleと永続化要件は[SECURITY.md](../SECURITY.md)を参照してください。
+private keyはmode `0600`、current user ownershipを必須とします。profile directoryとその親componentを含めsymlinkを拒否し、この検査はconfigure時だけでなくprofile load / activation時にも行います。credential lifecycleと永続化要件は[SECURITY.md](../SECURITY.md)を参照してください。
 
 GitHub App private keyの管理はGitHub公式資料を参照してください。
 
@@ -131,8 +131,9 @@ session内では次を自動設定します。
 - `gh` command終了時にtokenをbest-effortでrevokeし、一時config directoryを削除
 - `git fetch` / `git pull` / `git push` / `git ls-remote`は専用wrapperでGit process全体に1つの短命tokenを供給し、process終了時にbest-effortでrevoke
 - Git credential helperはwrapperが供給したprocess-local tokenだけを返し、`github.com`かつsession repositoryのHTTPS pathが一致する場合だけcredentialを供給
-- lower-precedenceのGit credential helperと`http.extraHeader`をresetし、既存Human Authorization headerへのfallbackを禁止
+- lower-precedenceのGit credential helperをresetし、`http.extraHeader`はglobal / github.com / session repository / `.git` URLで空値resetして既存Human Authorization headerへのfallbackを禁止
 - GitHub SSH remoteをsession内だけHTTPSへrewriteし、Git SSH / askpassを無効化してSSH identityへのfallbackを禁止
+- App JWT / Installation Tokenを送るcurlはuser curl configを読み込まず、GitHub APIへのHTTPS通信だけを許可
 - App JWTで認証されたApp metadataからslugを取得
 - Git Author / Committerを`{app-slug}[bot]`へ設定
 - bot user IDをGitHub APIから解決し、GitHub公式形式のnoreply emailを使用

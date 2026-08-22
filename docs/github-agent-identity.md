@@ -1,25 +1,21 @@
 # GitHub Agent identity
 
-`agent-dev`は、Claude Code / CodexからGitHubへwriteする際にHuman credentialを流用せず、AgentごとのGitHub App bot identityを利用するための認証補助を提供します。
+`agent-dev`は、Claude Code / CodexのGitHub writeをHuman credentialから分離し、AgentごとのGitHub App bot identityで実行します。
 
 ## Identity model
 
-推奨するprincipal分離は次のとおりです。
+| Principal | GitHub identity |
+|---|---|
+| Human | GitHub user |
+| Claude | dedicated GitHub App |
+| Codex | dedicated GitHub App |
+| ChatGPT | ChatGPT Codex Connector。現状はHuman-supervised exception |
 
-```text
-Human      -> GitHub user
-Claude     -> dedicated GitHub App
-Codex      -> dedicated GitHub App
-ChatGPT    -> ChatGPT Codex Connector (supervised exception)
-```
-
-GitHub API上のactorとGit commitのAuthor / Committerは別のidentity layerです。`agent-github-auth`はGitHub App Installation Tokenとbot用Git identityを同時に設定し、`gh` / `git push` / `git commit`を同じApp botへ揃えます。
-
-ChatGPT Codex Connectorのdirect writeは、このrepositoryでの実測ではHuman GitHub userとして記録されるため、専用App botとは分離できません。Human-supervisedな例外として扱います。
+GitHub API上のactorとGit commitのAuthor / Committerは別ですが、`agent-github-auth`は両方を同じApp botへ揃えます。
 
 ## GitHub Appの前提
 
-Agentごとに専用GitHub Appを作成し、利用者自身でinstallation repository scopeとrepository permissionsを制御してください。
+Agentごとに専用GitHub Appを作成し、repository accessとpermissionsを利用者側で制御します。
 
 基本permissions:
 
@@ -30,157 +26,90 @@ Issues         read/write
 Pull requests  read/write
 ```
 
-必要な場合のみ:
+必要な場合のみ `Actions` / `Checks` / `Commit statuses` のreadを追加します。`Administration` / `Workflows` / `Secrets` / `Environments` / `Actions write` は既定で付与しません。
 
-```text
-Actions          read
-Checks           read
-Commit statuses  read
-```
+repository accessは`Only select repositories`を推奨します。詳細なtrust boundaryは[SECURITY.md](../SECURITY.md)を正本とします。
 
-既定では付与しません。
-
-```text
-Administration
-Workflows
-Secrets
-Environments
-Actions write
-```
-
-repository accessは`Only select repositories`を安全側の推奨とします。permission、installation scope、credentialのtrust boundaryは[SECURITY.md](../SECURITY.md)を正本とします。
-
-GitHub Appの登録、permission、installation手順はGitHub公式資料を正本とします。
+GitHub Appの作成・permission・installationはGitHub公式資料を参照してください。
 
 - [Registering a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app)
 - [Choosing permissions for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)
 - [Installing your own GitHub App](https://docs.github.com/en/apps/using-github-apps/installing-your-own-github-app)
 
-## Private key配置
+## Setup
 
-Feature install時に次のcontainer-local directoryだけを作成します。
-
-```text
-~/.config/agent-dev/github-apps/
-├── claude/
-└── codex/
-```
-
-private keyは利用者がbuild / rebuild後に配置します。
-
-```text
-~/.config/agent-dev/github-apps/claude/private-key.pem
-~/.config/agent-dev/github-apps/codex/private-key.pem
-```
-
-private keyはmode `0600`、current user ownershipを必須とします。profile directoryとその親componentを含めsymlinkを拒否し、この検査はconfigure時だけでなくprofile load / activation時にも行います。credential lifecycleと永続化要件は[SECURITY.md](../SECURITY.md)を参照してください。
-
-GitHub App private keyの管理はGitHub公式資料を参照してください。
-
-- [Managing private keys for GitHub Apps](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/managing-private-keys-for-github-apps)
-
-## Profile設定
-
-profileにはApp IDだけを設定します。App slugは利用者入力を信用せず、private keyとApp IDで署名したApp JWTを使って`GET /app`から取得します。
+profileにはApp IDだけを保存します。App slugとbot identityは認証済みApp metadataから取得します。
 
 ```bash
 agent-github-auth configure claude <APP_ID>
 agent-github-auth configure codex <APP_ID>
 ```
 
-App IDはsecretではありません。設定は各profileの`config.json`へ保存されます。
+build / rebuild後にprivate keyを配置します。
 
-状態確認:
+```text
+~/.config/agent-dev/github-apps/claude/private-key.pem
+~/.config/agent-dev/github-apps/codex/private-key.pem
+```
+
+private keyはmode `0600`、current user ownershipが必要です。保管条件とlifecycleは[SECURITY.md](../SECURITY.md)を参照してください。
+
+確認:
 
 ```bash
 agent-github-auth status claude
 ```
 
-`status`はprivate key、App JWTで取得したbot identity、current repositoryへのinstallation、repo-scoped Installation Tokenのmint / revokeを確認します。token値は表示しません。revokeに失敗した場合は成功扱いせず異常終了します。
+`status`はApp identity、current repositoryへのinstallation、repo-scoped Installation Tokenのmint / revokeを確認します。token値は表示しません。
 
 ## Agent session
 
-Claude用session:
+interactive session:
 
 ```bash
 agent-github-auth claude
 ```
 
-Codex用session:
-
-```bash
-agent-github-auth codex
-```
-
-特定commandだけを実行する場合:
+特定commandだけを実行:
 
 ```bash
 agent-github-auth claude -- claude
 agent-github-auth codex -- codex
 ```
 
-session activationはApp credentialの排他利用をpreflightします。`GH_TOKEN` / `GITHUB_TOKEN` / `GH_ENTERPRISE_TOKEN` / `GITHUB_ENTERPRISE_TOKEN`が既に設定されている場合、または永続`gh auth`設定に既知のaccountが存在する場合はsessionを開始しません。credentialの出所を推測してshadowするのではなくfail closedします。Humanとして`gh`を使う環境とAgent App sessionを同時に成立させないことが前提です。
+session開始時の`origin`を認証対象repositoryとして固定します。session中に`cd`してもtoken scopeは変わりません。別repositoryを操作する場合は、そのrepositoryで新しいsessionを開始します。
 
-session開始時に`origin`からrepositoryを解決し、その`owner/repository`をsessionの認証対象として固定します。session中に別directoryへ`cd`してもtoken scopeは変更しません。`git -C`や`gh -R`などで別repositoryを指定しても、そのrepository用tokenを追加発行せず、認証対象外の操作はfail closedします。
+sessionでは次を保証します。
 
-session内では次を自動設定します。
+- `gh` / authenticated Git operationごとに短命Installation Tokenを発行し、diskへ保存しない
+- `gh` / `git push` / Git Author / Committerを同じApp bot identityへ揃える
+- Human `gh auth`、ambient GitHub token、既存Git credentialへfallbackしない
+- `github.com`以外の`gh` targetを拒否する
+- authenticated Git operationで別のAuthorization header / credential helperが有効ならfail closedする
+- GitHub SSH / interactive credential promptへfallbackしない
 
-- session開始時に選択したrepositoryだけを対象にGitHub App Installation Tokenを必要時に発行
-- `gh`実行ごとに一時`GH_CONFIG_DIR`を作り、永続化されたHuman用GitHub CLI credential / alias / extension configを参照しない
-- `gh`のdefault hostを`github.com`、default repositoryをsession repositoryへ固定し、Enterprise token環境変数とinteractive promptを無効化
-- `gh`の`--hostname`、`-R` / `--repo`、positional GitHub URLをtoken発行前に検査し、`github.com`以外を拒否
-- `gh` command終了時にtokenをbest-effortでrevokeし、一時config directoryを削除
-- `git fetch` / `git pull` / `git push` / `git ls-remote`は専用wrapperでGit process全体に1つの短命tokenを供給し、process終了時にbest-effortでrevoke
-- Git credential helperはwrapperが供給したprocess-local tokenだけを返し、`github.com`かつsession repositoryのHTTPS pathが一致する場合だけcredentialを供給
-- lower-precedenceのGit credential helperをresetし、authenticated Git operationのtoken発行前にeffective configを検査して任意のURL specificityにある`http.<url>.extraHeader=Authorization: ...`を拒否
-- GitHub SSH remoteをsession内だけHTTPSへrewriteし、Git SSH / askpassを無効化してSSH identityへのfallbackを禁止
-- App JWT / Installation Tokenを送るcurlはuser curl configを読み込まず、GitHub APIへのHTTPS通信だけを許可
-- App JWTで認証されたApp metadataからslugを取得
-- Git Author / Committerを`{app-slug}[bot]`へ設定
-- bot user IDをGitHub APIから解決し、GitHub公式形式のnoreply emailを使用
+実装上のcredential guardやprivate key compromise時の境界は[SECURITY.md](../SECURITY.md)を正本とします。
 
-local-onlyなGit commandはInstallation Tokenを発行せず、実際にremote認証が必要な上記commandだけをwrapper対象とします。credentialの保存可否、token lifecycle、private key compromise時の境界は[SECURITY.md](../SECURITY.md)を正本とします。
-
-`agent-github-auth`はGitHub.comだけを対象とします。GitHub Enterprise Server / Enterprise Cloud data-residency host向けのtargetやcredentialはApp sessionへ持ち込みません。別hostを明示した`gh` commandはtoken発行前に拒否します。
-
-GitHub Appの認証とInstallation Tokenの仕様はGitHub公式資料を参照してください。
+GitHub App認証の仕様:
 
 - [Authenticating as a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app)
 - [Generating an installation access token for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)
-- [REST API endpoints for GitHub Apps](https://docs.github.com/en/rest/apps/apps)
-- [GitHub CLI environment variables](https://cli.github.com/manual/gh_help_environment)
-- [GitHub CLI authentication status](https://cli.github.com/manual/gh_auth_status)
-
-## Repository scope
-
-runtimeではsession activation時のGit remote `origin`からrepositoryを解決し、そのrepository名をsessionの認証対象として固定してInstallation Tokenを発行します。
-
-```text
-Git remote origin at activation
-  -> owner/repository
-  -> freeze as session repository
-  -> repository-scoped Installation Token
-```
-
-repository選択を各wrapperのcurrent working directoryから再計算しないため、session中の`cd`や`git -C`で意図せずtoken scopeが変わることはありません。別repositoryを操作する場合は、そのrepositoryで新しい`agent-github-auth` sessionを開始します。
-
-このruntime behaviorとGitHub App installation scopeの関係、保証範囲は[SECURITY.md](../SECURITY.md)を参照してください。
 
 ## Repository rules
 
-Agent Appへdefault / protected branchのbypassを与えないでください。repository側では少なくとも次をGitHub Rulesetで強制します。
+Agent Appへdefault branchのbypassを与えません。repository側ではRulesetで少なくとも次を強制します。
 
-- default branchへのPull Request必須
+- Pull Request必須
 - required status checks
 - force push禁止
 - branch deletion禁止
 - Agent Appによるdefault branch直接更新禁止
 
-RulesetはFeatureが自動作成しません。GitHub側のrepository security controlとして管理してください。
+RulesetはFeatureから自動作成しません。
 
 - [About rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)
 - [Creating rulesets for a repository](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository)
 
 ## Security
 
-credential persistence、Human credentialの扱い、GitHub App permission / installation scope、private key、Docker daemon、trusted repositoryを含むtrust boundaryは[SECURITY.md](../SECURITY.md)を唯一の正本とします。このdocumentでは操作方法とidentityの挙動だけを定義し、別のsecurity contractを持ちません。
+credential persistence、Human credential、private key、installation scope、Docker daemonを含むtrust boundaryは[SECURITY.md](../SECURITY.md)を唯一の正本とします。

@@ -58,7 +58,8 @@ rm -rf "$tmp_repo"
 trap - EXIT
 
 agent-github-auth configure claude 123456 >/dev/null
-config_path="$HOME/.config/agent-dev/github-apps/claude/config.json"
+profile_dir="$HOME/.config/agent-dev/github-apps/claude"
+config_path="$profile_dir/config.json"
 [[ -f $config_path ]]
 [[ $(jq -r '.app_id' "$config_path") == 123456 ]]
 if jq -e 'has("app_slug")' "$config_path" >/dev/null; then
@@ -80,19 +81,46 @@ fi
 rm "$HOME/.config/agent-dev/github-apps/symlink-profile"
 rm -rf "$symlink_target"
 
+# Re-check every path component during load: replacing a configured profile
+# directory with a symlink after configure must still fail closed.
+profile_backup=$(mktemp -d)
+profile_redirect=$(mktemp -d)
+rmdir "$profile_backup"
+mv "$profile_dir" "$profile_backup"
+cp -a "$profile_backup/." "$profile_redirect/"
+ln -s "$profile_redirect" "$profile_dir"
+if (agent_github_load_profile claude) >/dev/null 2>&1; then
+  echo 'ERROR: profile load accepted a symlink inserted after configuration.' >&2
+  exit 1
+fi
+rm "$profile_dir"
+mv "$profile_backup" "$profile_dir"
+rm -rf "$profile_redirect"
+
 key_target=$(mktemp)
 chmod 0600 "$key_target"
-ln -s "$key_target" "$HOME/.config/agent-dev/github-apps/claude/private-key.pem"
-if (agent_github_validate_private_key "$HOME/.config/agent-dev/github-apps/claude/private-key.pem") >/dev/null 2>&1; then
+ln -s "$key_target" "$profile_dir/private-key.pem"
+if (agent_github_validate_private_key "$profile_dir/private-key.pem") >/dev/null 2>&1; then
   echo 'ERROR: symlinked GitHub App private key was accepted.' >&2
   exit 1
 fi
-rm "$HOME/.config/agent-dev/github-apps/claude/private-key.pem" "$key_target"
+rm "$profile_dir/private-key.pem" "$key_target"
 
 if agent-github-auth claude -- true >/dev/null 2>&1; then
   echo 'ERROR: GitHub App auth must fail closed when the private key is not configured.' >&2
   exit 1
 fi
+
+# curl configuration must never precede the library's security options. A fake
+# curl verifies that -q is the first option supplied by the shared helper.
+fake_bin=$(mktemp -d)
+cat >"$fake_bin/curl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "${1:-}"
+EOF
+chmod 0755 "$fake_bin/curl"
+[[ $(PATH="$fake_bin:$PATH" agent_github_curl --version) == -q ]]
+rm -rf "$fake_bin"
 
 # Credential helper only returns the process-local token for the exact frozen
 # GitHub.com repository path. Missing path, another repo, or Enterprise host
@@ -118,5 +146,8 @@ grep -Fq 'GH_PROMPT_DISABLED=1' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/git
 grep -Fq 'auth status --json hosts' /usr/local/bin/agent-github-auth
+grep -Fq 'repo_http_url=' /usr/local/bin/agent-github-auth
+grep -Fq 'agent_github_curl --fail' /usr/local/lib/agent-dev/github-auth-lib.sh
+grep -Fq "command curl -q --proto '=https'" /usr/local/lib/agent-dev/github-auth-lib.sh
 
 printf 'agent-dev Feature validation passed.\n'

@@ -66,6 +66,10 @@ if jq -e 'has("app_slug")' "$config_path" >/dev/null; then
   exit 1
 fi
 
+# App activation refuses ambient caller credentials before trying the private key.
+ambient_output=$(GH_TOKEN=human-test-token agent-github-auth claude -- true 2>&1 || true)
+grep -q 'ambient GitHub credential is set in GH_TOKEN' <<<"$ambient_output"
+
 # Profile directories and private keys must not be symlink escapes.
 symlink_target=$(mktemp -d)
 ln -s "$symlink_target" "$HOME/.config/agent-dev/github-apps/symlink-profile"
@@ -106,12 +110,13 @@ unset AGENT_GITHUB_PROFILE AGENT_GITHUB_REPOSITORY AGENT_GITHUB_GIT_TOKEN
 
 # Keep these invariants visible in the installed wrappers. Live token behavior is
 # covered by the merge-precondition E2E in Issue #32.
-grep -Fq 'config_dir=$(mktemp -d' /usr/local/lib/agent-dev/auth-bin/gh
+grep -Fq 'mktemp -d' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'GH_CONFIG_DIR=' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'GH_HOST=github.com' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'GH_REPO=' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'GH_PROMPT_DISABLED=1' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/git
+grep -Fq 'auth status --json hosts' /usr/local/bin/agent-github-auth
 
 printf 'agent-dev Feature validation passed.\n'

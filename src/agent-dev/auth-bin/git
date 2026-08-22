@@ -11,6 +11,8 @@ profile=${AGENT_GITHUB_PROFILE:-}
 if [[ -z $profile ]]; then
   exec "$real_git" "$@"
 fi
+repository=${AGENT_GITHUB_REPOSITORY:-}
+[[ -n $repository ]] || agent_github_die 'AGENT_GITHUB_REPOSITORY is not set in authenticated GitHub App session'
 
 resolve_subcommand() {
   local arg
@@ -42,7 +44,7 @@ resolve_subcommand() {
 subcommand=$(resolve_subcommand "$@" || true)
 case "$subcommand" in
   fetch|pull|push|ls-remote)
-    token=$(agent_github_mint_token "$profile")
+    token=$(agent_github_mint_token "$profile" "$repository")
     export AGENT_GITHUB_GIT_TOKEN=$token
 
     set +e

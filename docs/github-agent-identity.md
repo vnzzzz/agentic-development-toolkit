@@ -48,7 +48,7 @@ Environments
 Actions write
 ```
 
-repository accessは`Only select repositories`を安全側の推奨とします。`All repositories`を選択した場合、private keyを取得したprocessはinstallationが許可するrepository全体を対象に新しいInstallation Tokenを発行できます。
+repository accessは`Only select repositories`を安全側の推奨とします。permission、installation scope、credentialのtrust boundaryは[SECURITY.md](../SECURITY.md)を正本とします。
 
 GitHub Appの登録、permission、installation手順はGitHub公式資料を正本とします。
 
@@ -73,7 +73,7 @@ private keyは利用者がbuild / rebuild後に配置します。
 ~/.config/agent-dev/github-apps/codex/private-key.pem
 ```
 
-private keyはmode `0600`、current user ownershipを必須とします。workspace、Git repository、Feature artifact、named volumeへは保存しません。Dev Container rebuildで消えることを仕様とします。
+private keyはmode `0600`、current user ownershipを必須とします。このpathのcredential lifecycleと永続化要件は[SECURITY.md](../SECURITY.md)を参照してください。
 
 GitHub App private keyの管理はGitHub公式資料を参照してください。
 
@@ -81,14 +81,14 @@ GitHub App private keyの管理はGitHub公式資料を参照してください�
 
 ## Profile設定
 
-App IDとApp slugはsecretではありません。profileごとに次のcommandで設定します。
+profileにはApp IDだけを設定します。App slugは利用者入力を信用せず、private keyとApp IDで署名したApp JWTを使って`GET /app`から取得します。
 
 ```bash
-agent-github-auth configure claude <APP_ID> <APP_SLUG>
-agent-github-auth configure codex <APP_ID> <APP_SLUG>
+agent-github-auth configure claude <APP_ID>
+agent-github-auth configure codex <APP_ID>
 ```
 
-設定は各profileの`config.json`へ保存されます。rebuild後はprivate keyと合わせて再設定します。
+App IDはsecretではありません。設定は各profileの`config.json`へ保存されます。
 
 状態確認:
 
@@ -96,7 +96,7 @@ agent-github-auth configure codex <APP_ID> <APP_SLUG>
 agent-github-auth status claude
 ```
 
-`status`はprivate key、bot identity、current repositoryへのinstallation、repo-scoped Installation Tokenのmint / revokeを確認します。token値は表示しません。
+`status`はprivate key、App JWTで取得したbot identity、current repositoryへのinstallation、repo-scoped Installation Tokenのmint / revokeを確認します。token値は表示しません。revokeに失敗した場合は成功扱いせず異常終了します。
 
 ## Agent session
 
@@ -121,24 +121,26 @@ agent-github-auth codex -- codex
 
 session内では次を自動設定します。
 
-- current repositoryだけにscopeしたGitHub App Installation Tokenを必要時に発行
-- `gh`実行時に短命tokenを注入し、終了後best-effortでrevoke
+- current repository用のGitHub App Installation Tokenを必要時に発行
+- `gh`実行時に短命tokenを注入
 - Git HTTPS credential helperから`git fetch` / `git push`へ短命tokenを供給
 - lower-precedenceのGit credential helperをリセットし、Human credentialへのfallbackを禁止
 - GitHub SSH remoteをsession内だけHTTPSへrewriteし、SSH identityへのfallbackを禁止
+- App JWTで認証されたApp metadataからslugを取得
 - Git Author / Committerを`{app-slug}[bot]`へ設定
 - bot user IDをGitHub APIから解決し、GitHub公式形式のnoreply emailを使用
 
-Installation Tokenはdisk、named volume、`gh auth` credential storeへ保存しません。固定tokenを長時間保持せず、`gh` / Git credential取得ごとに新しいrepo-scoped tokenをmintします。
+credentialの保存可否、token lifecycle、private key compromise時の境界は[SECURITY.md](../SECURITY.md)を正本とします。
 
-GitHub App Installation Tokenの仕様はGitHub公式資料を参照してください。
+GitHub Appの認証とInstallation Tokenの仕様はGitHub公式資料を参照してください。
 
-- [Generating an installation access token for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)
 - [Authenticating as a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app)
+- [Generating an installation access token for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)
+- [REST API endpoints for GitHub Apps](https://docs.github.com/en/rest/apps/apps)
 
 ## Repository scope
 
-runtime tokenはcurrent repositoryのnameを指定して発行します。
+runtimeではGit remoteの`origin`からcurrent repositoryを解決し、そのrepository名を指定してInstallation Tokenを発行します。
 
 ```text
 Git remote origin
@@ -146,9 +148,7 @@ Git remote origin
   -> repository-scoped Installation Token
 ```
 
-これは通常操作のblast radiusをcurrent repositoryへ縮小します。ただしprivate key自体へAgent processがアクセスできるため、private key compromiseに対する最終境界はGitHub App installationのrepository accessです。
-
-そのため、repository scopeの強制をtoolkitだけへ依存せず、GitHub App installation側でも必要最小限にしてください。
+このruntime behaviorとGitHub App installation scopeの関係、保証範囲は[SECURITY.md](../SECURITY.md)を参照してください。
 
 ## Repository rules
 
@@ -165,22 +165,6 @@ RulesetはFeatureが自動作成しません。GitHub側のrepository security c
 - [About rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)
 - [Creating rulesets for a repository](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository)
 
-## Security boundary
+## Security
 
-`agent-dev`が保証する範囲:
-
-- Human PAT / Human `gh auth` credentialをAgent identityとして利用しない
-- private keyをworkspace / repository / Feature artifact / named volumeへ保存しない
-- Installation Tokenを永続化しない
-- runtime tokenをcurrent repositoryへ限定する
-- Agent App permissionを超える権限を作らない
-
-利用者責任:
-
-- GitHub App自体のpermissions
-- App installation repository scope
-- private keyの配置・保管・revoke / rotation
-- trusted repositoryでのみcredential-access可能なAgent sessionを利用すること
-- repository Ruleset / branch protection
-
-Docker daemonを操作できる主体はcontainerやnamed volumeの境界を越えられるため、Docker daemonはtrust boundary外です。Agent ContainerへDocker socketをmountしないでください。詳細は[SECURITY.md](../SECURITY.md)を参照してください。
+credential persistence、Human credentialの扱い、GitHub App permission / installation scope、private key、Docker daemon、trusted repositoryを含むtrust boundaryは[SECURITY.md](../SECURITY.md)を唯一の正本とします。このdocumentでは操作方法とidentityの挙動だけを定義し、別のsecurity contractを持ちません。

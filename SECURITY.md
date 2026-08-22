@@ -42,7 +42,7 @@ Claude / CodexからGitHubへwriteする場合は、Agentごとの専用GitHub A
 ~/.config/agent-dev/github-apps/<profile>/private-key.pem
 ```
 
-このpathはnamed volumeではありません。private keyはDev Container rebuildで消えることを仕様とし、workspaceやGit管理対象へ退避しません。mode `0600`かつcurrent user ownershipを必須とし、symlinkは拒否します。
+このpathはnamed volumeではありません。private keyはDev Container rebuildで消えることを仕様とし、workspaceやGit管理対象へ退避しません。credential root / `github-apps` / profile directoryはmode `0700`、profile config / private keyはmode `0600`、current user ownershipを必須とします。configure時だけでなくprofile load / activation時にもpathの全componentを再検査し、途中directoryを含むsymlinkを拒否します。
 
 認証sessionではactivation時のrepositoryだけにscopeした短命Installation Tokenを必要時に発行し、`gh` / Git HTTPS credentialへ供給します。tokenはdisk、named volume、`gh auth` credential storeへ保存しません。
 
@@ -50,11 +50,11 @@ App sessionはcredential sourceを排他的にします。`GH_TOKEN` / `GITHUB_T
 
 App-authenticated `gh`は永続化されたHuman用`GH_CONFIG_DIR`を参照せず、commandごとの一時config directoryを使用します。hostは`github.com`、default repositoryはactivation時のrepositoryに固定し、Enterprise用token環境変数とinteractive promptを無効化します。
 
-Gitはsession内でlower-precedence credential helperをresetし、`credential.useHttpPath`でactivation時repositoryのpath一致を要求します。lower-precedenceの`http.extraHeader`も空値でresetし、GitHub接続でSSH credentialへfallbackしないよう`GIT_SSH_COMMAND`とaskpassを無効化します。
+Gitはsession内でlower-precedence credential helperをresetし、`credential.useHttpPath`でactivation時repositoryのpath一致を要求します。`http.extraHeader`はglobal / github.com / activation repository / `.git` URLの各scopeで空値resetし、より具体的なHuman Authorization headerへfallbackしないようにします。GitHub接続では`GIT_SSH_COMMAND`とaskpassも無効化します。
+
+GitHub App API通信は`https://api.github.com`へ固定し、plain HTTP originを拒否します。credential-bearing HTTP requestは共通curl helperを通し、`curl -q`を先頭optionとしてuser `~/.curlrc`および`CURL_HOME`で選択されたcurl configを読み込みません。HTTPS以外のprotocolも許可しません。
 
 これらはHuman credentialを誤利用しないためのworkflow guardです。認証済みcontainer内のAgent processはprivate keyを読めるため、同一user processを敵対的にsandboxする機構ではありません。private key compromise時の最終的なrepository blast radiusはGitHub App installation scopeです。runtime tokenのrepository scopeはdefense-in-depthであり、installation scopeの代替ではありません。
-
-`agent-github-auth`はGitHub.comのみを対象とし、App JWT / Installation Token発行先APIを利用者環境変数から変更しません。
 
 GitHub Agent identityのpermissions、利用方法、Ruleset前提は[GitHub Agent identity](docs/github-agent-identity.md)を参照してください。
 

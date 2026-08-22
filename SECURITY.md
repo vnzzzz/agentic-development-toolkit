@@ -13,6 +13,10 @@
 - 外部GitHub Actionsはfull commit SHAへ固定する。
 - release workflowの権限は`contents: read`と`packages: write`に限定する。
 - 個人PATをrelease用CI secretとして保存しない。
+- Agent identityにはHuman PAT / Human `gh auth` credentialを流用しない。
+- Agentごとに専用GitHub Appを使用し、least privilegeとrepository installation scopeを利用者側で設定する。
+- GitHub App private keyをworkspace、repository、GHCR artifact、named volumeへ保存しない。
+- GitHub App Installation Tokenをdiskやcredential storeへ永続保存しない。
 
 ## Credential boundary
 
@@ -27,6 +31,26 @@ volume名、container内mount先、環境変数は秘密情報ではありませ
 一方、認証済みcontainer内のcodeは同じuser権限で認証状態へアクセスできます。未確認のrepository、script、dependencyをcredential access可能な状態で実行しないでください。
 
 認証状態を破棄する場合は対象Dev Containerを削除し、対応するnamed volumeを削除します。必要に応じてprovider側でもtoken / sessionをrevokeします。
+
+## GitHub Agent identity
+
+Claude / CodexからGitHubへwriteする場合は、Agentごとの専用GitHub Appを利用します。GitHub Appの作成、repository installation scope、repository permissions、private key rotationは利用者責任です。
+
+`agent-github-auth`用private keyは次のcontainer-local pathへ利用者が配置します。
+
+```text
+~/.config/agent-dev/github-apps/<profile>/private-key.pem
+```
+
+このpathはnamed volumeではありません。private keyはDev Container rebuildで消えることを仕様とし、workspaceやGit管理対象へ退避しません。mode `0600`かつcurrent user ownershipを必須とします。
+
+認証sessionではcurrent repositoryだけにscopeした短命Installation Tokenを必要時に発行し、`gh` / Git HTTPS credentialへ供給します。tokenはdisk、named volume、`gh auth` credential storeへ保存しません。Human credentialへfallbackしないよう、Git credential helperとSSH remoteをsession内で明示的に制御します。
+
+private keyへAgent processがアクセスできるため、private key compromise時の最終的なrepository blast radiusはGitHub App installation scopeです。runtime tokenのrepository scopeはdefense-in-depthであり、installation scopeの代替ではありません。
+
+GitHub Agent identityのpermissions、利用方法、Ruleset前提は[GitHub Agent identity](docs/github-agent-identity.md)を正本とします。
+
+Docker daemonを操作できる主体はcontainerやnamed volumeの境界を越えられます。Docker socketをAgent Containerへmountしない現行方針を維持します。
 
 ## Release supply chain
 
@@ -47,4 +71,5 @@ Issueへcredentialや機密sourceを貼り付けないでください。再現�
 ## Supporting documents
 
 - Featureのconsumer / release contract: [docs/dev-container-feature.md](docs/dev-container-feature.md)
+- GitHub Agent identity: [docs/github-agent-identity.md](docs/github-agent-identity.md)
 - repository変更時の制約: [AGENTS.md](AGENTS.md)

@@ -29,8 +29,17 @@ command -v agent-github-credential >/dev/null
 [[ -x /usr/local/lib/agent-dev/real-bin/git ]]
 agent-github-auth --help >/dev/null
 
+agent-github-auth configure claude 123456 >/dev/null
+config_path="$HOME/.config/agent-dev/github-apps/claude/config.json"
+[[ -f $config_path ]]
+[[ $(jq -r '.app_id' "$config_path") == 123456 ]]
+if jq -e 'has("app_slug")' "$config_path" >/dev/null; then
+  echo 'ERROR: GitHub App slug must be derived from authenticated App metadata, not stored in profile config.' >&2
+  exit 1
+fi
+
 if agent-github-auth claude -- true >/dev/null 2>&1; then
-  echo 'ERROR: GitHub App auth must fail closed when the profile/private key is not configured.' >&2
+  echo 'ERROR: GitHub App auth must fail closed when the private key is not configured.' >&2
   exit 1
 fi
 

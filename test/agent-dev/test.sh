@@ -122,30 +122,37 @@ chmod 0755 "$fake_bin/curl"
 [[ $(PATH="$fake_bin:$PATH" agent_github_curl --version) == -q ]]
 rm -rf "$fake_bin"
 
-# A repository-specific Human Authorization header is more specific than host
-# defaults. Verify that the environment-level exact repository/.git resets used
-# by the App session make Git's effective URL-matched extraHeader empty.
+# GH_TOKEN is also accepted for ghe.com. Explicit CLI host/repository selectors
+# must therefore be rejected before the wrapper mints or exports an App token.
+export AGENT_GITHUB_PROFILE=claude
+export AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo
+ghe_host_output=$(/usr/local/lib/agent-dev/auth-bin/gh api --hostname tenant.ghe.com /user 2>&1 || true)
+grep -q 'refuses non-github.com --hostname target' <<<"$ghe_host_output"
+ghe_repo_output=$(/usr/local/lib/agent-dev/auth-bin/gh repo view -R tenant.ghe.com/example/repo 2>&1 || true)
+grep -q 'refuses non-github.com repository host' <<<"$ghe_repo_output"
+unset AGENT_GITHUB_PROFILE AGENT_GITHUB_REPOSITORY
+
+# Do not try to out-specify arbitrary http.<url>.extraHeader entries. Before any
+# token is minted, reject Authorization headers from the effective Git config,
+# including service-path-specific and caller-supplied command-scope values.
 header_repo=$(mktemp -d)
 git -C "$header_repo" init -q
 git -C "$header_repo" config --local \
-  'http.https://github.com/vnzzzz/example-repo.extraHeader' \
+  'http.https://github.com/vnzzzz/example-repo.git/info/refs.extraHeader' \
   'Authorization: human-test-token'
-git -C "$header_repo" config --local \
-  'http.https://github.com/vnzzzz/example-repo.git.extraHeader' \
-  'Authorization: human-test-token'
-effective_header=$(env \
-  GIT_CONFIG_COUNT=4 \
-  GIT_CONFIG_KEY_0=http.extraHeader \
-  GIT_CONFIG_VALUE_0= \
-  GIT_CONFIG_KEY_1=http.https://github.com/.extraHeader \
-  GIT_CONFIG_VALUE_1= \
-  GIT_CONFIG_KEY_2=http.https://github.com/vnzzzz/example-repo.extraHeader \
-  GIT_CONFIG_VALUE_2= \
-  GIT_CONFIG_KEY_3=http.https://github.com/vnzzzz/example-repo.git.extraHeader \
-  GIT_CONFIG_VALUE_3= \
-  git -C "$header_repo" config --get-urlmatch \
-  http.extraHeader https://github.com/vnzzzz/example-repo.git || true)
-[[ -z $effective_header ]]
+header_output=$(AGENT_GITHUB_PROFILE=claude \
+  AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo \
+  /usr/local/lib/agent-dev/auth-bin/git -C "$header_repo" \
+  ls-remote https://github.com/vnzzzz/example-repo.git 2>&1 || true)
+grep -q 'refuses configured Git HTTP Authorization extraHeader' <<<"$header_output"
+git -C "$header_repo" config --unset-all \
+  'http.https://github.com/vnzzzz/example-repo.git/info/refs.extraHeader'
+cli_header_output=$(AGENT_GITHUB_PROFILE=claude \
+  AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo \
+  /usr/local/lib/agent-dev/auth-bin/git -C "$header_repo" \
+  -c 'http.https://github.com/vnzzzz/example-repo.git/info/refs.extraHeader=Authorization: human-test-token' \
+  ls-remote https://github.com/vnzzzz/example-repo.git 2>&1 || true)
+grep -q 'refuses configured Git HTTP Authorization extraHeader' <<<"$cli_header_output"
 rm -rf "$header_repo"
 
 # Credential helper only returns the process-local token for the exact frozen
@@ -169,6 +176,8 @@ grep -Fq 'GH_CONFIG_DIR=' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'GH_HOST=github.com' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'GH_REPO=' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'GH_PROMPT_DISABLED=1' /usr/local/lib/agent-dev/auth-bin/gh
+grep -Fq 'assert_github_com_command_target' /usr/local/lib/agent-dev/auth-bin/gh
+grep -Fq 'assert_no_git_authorization_extraheader' /usr/local/lib/agent-dev/auth-bin/git
 grep -Fq 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/git
 grep -Fq 'auth status --json hosts' /usr/local/bin/agent-github-auth

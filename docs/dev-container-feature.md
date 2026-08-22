@@ -56,11 +56,11 @@ credential、named volume、host mount、trusted repositoryに関する要件と
 
 ## GitHub Agent identity
 
-FeatureはPATH上に`agent-github-auth`を提供します。profile metadataの設定例:
+FeatureはPATH上に`agent-github-auth`を提供します。profileにはApp IDだけを設定し、App slug / bot identityは認証済みApp metadataから自動取得します。
 
 ```bash
-agent-github-auth configure claude <APP_ID> <APP_SLUG>
-agent-github-auth configure codex <APP_ID> <APP_SLUG>
+agent-github-auth configure claude <APP_ID>
+agent-github-auth configure codex <APP_ID>
 ```
 
 GitHub App private keyはbuild後に次へ配置し、mode `0600`にします。
@@ -85,7 +85,7 @@ agent-github-auth codex -- codex
 
 session内では`gh`とGit HTTPS credentialがGitHub Appのrepo-scoped Installation Tokenを必要時に取得し、Git Author / Committerも同じApp botへ設定されます。Human GitHub credentialへのfallbackは行いません。
 
-private keyはnamed volumeへ保存せず、Dev Container rebuildで消えます。詳細なpermissions、credential lifecycle、repository scope、Ruleset要件は[GitHub Agent identity](github-agent-identity.md)を正本とします。
+private keyはnamed volumeへ保存せず、Dev Container rebuildで消えます。詳細なpermissions、credential lifecycle、repository scope、Ruleset要件は[GitHub Agent identity](github-agent-identity.md)を参照し、trust boundaryは[SECURITY.md](../SECURITY.md)を正本とします。
 
 ## Versioning
 
@@ -149,7 +149,7 @@ consumerやこのrepository自身が認証なしで利用するには、Feature 
 
 このrepository自身の`.devcontainer/`も、GHCRへ公開済みの`agent-dev:1`を利用します。commit済み`.devcontainer-lock.json`が開発環境として使うexact versionとdigestを固定します。
 
-これは循環依存ではありません。Featureの配布境界は`src/agent-dev/`だけであり、repositoryの`.devcontainer/`はFeature artifactへ含まれません。self-hosting側は既にpublish済みartifactをconsumeし、編集中のFeature sourceを直接参照しません。
+これは循環依存ではありません。Featureの配布境界は`src/agent-dev/`だけであり、repositoryの`.devcontainer/`はartifactへ含まれません。self-hosting側は既にpublish済みartifactをconsumeし、編集中のFeature sourceを直接参照しません。
 
 次versionを開発している間も、toolkit自身のDev Containerは直前に採用した公開済みversionを使います。候補versionは次のコマンドでsourceから別containerへ導入して検証します。
 

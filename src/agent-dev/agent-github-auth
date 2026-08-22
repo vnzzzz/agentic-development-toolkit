@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# shellcheck source=/dev/null
+source /usr/local/lib/agent-dev/github-auth-lib.sh
+
+usage() {
+  cat <<'EOF'
+Usage:
+  agent-github-auth configure <profile> <app-id> <app-slug>
+  agent-github-auth status <profile>
+  agent-github-auth <profile> [-- <command> [args...]]
+
+Examples:
+  agent-github-auth configure claude 123456 my-claude-agent
+  cp /path/to/private-key.pem ~/.config/agent-dev/github-apps/claude/private-key.pem
+  chmod 600 ~/.config/agent-dev/github-apps/claude/private-key.pem
+  agent-github-auth claude
+  agent-github-auth codex -- codex
+EOF
+}
+
+configure_profile() {
+  local profile=$1 app_id=$2 app_slug=$3 profile_dir config_path temp_path
+  agent_github_validate_profile_name "$profile"
+  [[ $app_id =~ ^[0-9]+$ ]] || agent_github_die 'app-id must be numeric'
+  [[ $app_slug =~ ^[A-Za-z0-9-]+$ ]] || agent_github_die 'app-slug may contain only letters, digits, and hyphens'
+
+  profile_dir=$(agent_github_profile_dir "$profile")
+  config_path=$(agent_github_config_path "$profile")
+  mkdir -p "$profile_dir"
+  chmod 0700 "$HOME/.config/agent-dev" "$HOME/.config/agent-dev/github-apps" "$profile_dir" 2>/dev/null || true
+  temp_path=$(mktemp "$profile_dir/.config.XXXXXX")
+  jq -n --argjson app_id "$app_id" --arg app_slug "$app_slug" \
+    '{app_id:$app_id,app_slug:$app_slug}' >"$temp_path"
+  chmod 0600 "$temp_path"
+  mv "$temp_path" "$config_path"
+
+  printf 'Configured GitHub App profile: %s\n' "$profile"
+  printf 'Private key path: %s\n' "$(agent_github_key_path "$profile")"
+  printf 'Place the private key there and set mode 0600 before activation.\n'
+}
+
+status_profile() {
+  local profile=$1
+  local token
+
+  agent_github_load_profile "$profile"
+  agent_github_validate_private_key "$AGENT_GITHUB_KEY_PATH"
+  agent_github_current_repo
+  agent_github_bot_identity "$profile"
+  token=$(agent_github_mint_token "$profile")
+  agent_github_revoke_token "$token" >/dev/null 2>&1 || true
+
+  printf 'Profile: %s\n' "$profile"
+  printf 'App: %s (ID %s)\n' "$AGENT_GITHUB_APP_SLUG" "$AGENT_GITHUB_APP_ID"
+  printf 'Actor: %s <%s>\n' "$AGENT_GITHUB_BOT_LOGIN" "$AGENT_GITHUB_BOT_EMAIL"
+  printf 'Repository: %s\n' "$AGENT_GITHUB_REPO_FULL_NAME"
+  printf 'Private key: %s (validated, mode 0600)\n' "$AGENT_GITHUB_KEY_PATH"
+  printf 'Repository-scoped installation token: mint/revoke succeeded\n'
+}
+
+add_git_config() {
+  local config_key=$1 config_value=$2 index key_name value_name
+  index=${GIT_CONFIG_COUNT:-0}
+  key_name=GIT_CONFIG_KEY_${index}
+  value_name=GIT_CONFIG_VALUE_${index}
+  export "$key_name=$config_key"
+  export "$value_name=$config_value"
+  export GIT_CONFIG_COUNT=$((index + 1))
+}
+
+activate_profile() {
+  local profile=$1
+  shift
+  local token shell_bin
+
+  agent_github_load_profile "$profile"
+  agent_github_validate_private_key "$AGENT_GITHUB_KEY_PATH"
+  agent_github_current_repo
+  agent_github_bot_identity "$profile"
+
+  # Fail closed before entering the session if the App is not installed for the
+  # current repository or a repository-scoped token cannot be minted.
+  token=$(agent_github_mint_token "$profile")
+  agent_github_revoke_token "$token" >/dev/null 2>&1 || true
+
+  export AGENT_GITHUB_PROFILE=$profile
+  export AGENT_GITHUB_REPOSITORY=$AGENT_GITHUB_REPO_FULL_NAME
+  export AGENT_GITHUB_BOT_NAME=$AGENT_GITHUB_BOT_LOGIN
+  export AGENT_GITHUB_BOT_EMAIL
+  export PATH=/usr/local/lib/agent-dev/auth-bin:$PATH
+
+  # Remove interactive/user credential fallbacks inside the App-authenticated
+  # session. The empty helper resets lower-precedence helpers before ours.
+  add_git_config credential.helper ''
+  add_git_config credential.helper '!agent-github-credential'
+  add_git_config credential.useHttpPath true
+  add_git_config user.name "$AGENT_GITHUB_BOT_LOGIN"
+  add_git_config user.email "$AGENT_GITHUB_BOT_EMAIL"
+  add_git_config url.https://github.com/.insteadOf git@github.com:
+  add_git_config url.https://github.com/.insteadOf ssh://git@github.com/
+
+  export GIT_AUTHOR_NAME=$AGENT_GITHUB_BOT_LOGIN
+  export GIT_AUTHOR_EMAIL=$AGENT_GITHUB_BOT_EMAIL
+  export GIT_COMMITTER_NAME=$AGENT_GITHUB_BOT_LOGIN
+  export GIT_COMMITTER_EMAIL=$AGENT_GITHUB_BOT_EMAIL
+  export GIT_TERMINAL_PROMPT=0
+  export GIT_ASKPASS=/bin/false
+  unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN
+
+  printf 'GitHub App session: %s as %s for %s\n' \
+    "$profile" "$AGENT_GITHUB_BOT_LOGIN" "$AGENT_GITHUB_REPO_FULL_NAME"
+
+  if [[ ${1:-} == -- ]]; then
+    shift
+    [[ $# -gt 0 ]] || agent_github_die 'a command is required after --'
+    exec "$@"
+  fi
+  [[ $# -eq 0 ]] || agent_github_die 'unexpected arguments; use -- before a command'
+
+  shell_bin=${SHELL:-/bin/bash}
+  exec "$shell_bin" -i
+}
+
+case ${1:-} in
+  configure)
+    [[ $# -eq 4 ]] || {
+      usage >&2
+      exit 2
+    }
+    configure_profile "$2" "$3" "$4"
+    ;;
+  status)
+    [[ $# -eq 2 ]] || {
+      usage >&2
+      exit 2
+    }
+    status_profile "$2"
+    ;;
+  -h|--help|help|'')
+    usage
+    ;;
+  *)
+    profile=$1
+    shift
+    activate_profile "$profile" "$@"
+    ;;
+esac

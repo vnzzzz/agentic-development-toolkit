@@ -120,6 +120,12 @@ ghe_host_output=$(/usr/local/lib/agent-dev/auth-bin/gh api --hostname tenant.ghe
 grep -q 'refuses non-github.com --hostname target' <<<"$ghe_host_output"
 ghe_repo_output=$(/usr/local/lib/agent-dev/auth-bin/gh repo view -R tenant.ghe.com/example/repo 2>&1 || true)
 grep -q 'refuses non-github.com repository host' <<<"$ghe_repo_output"
+ghe_short_host_output=$(/usr/local/lib/agent-dev/auth-bin/gh auth status -h tenant.ghe.com 2>&1 || true)
+grep -q 'refuses non-github.com -h target' <<<"$ghe_short_host_output"
+ghe_joined_host_output=$(/usr/local/lib/agent-dev/auth-bin/gh auth status -htenant.ghe.com 2>&1 || true)
+grep -q 'refuses non-github.com -h target' <<<"$ghe_joined_host_output"
+auth_token_output=$(/usr/local/lib/agent-dev/auth-bin/gh auth token 2>&1 || true)
+grep -q 'gh auth token is disabled in GitHub App session' <<<"$auth_token_output"
 unset AGENT_GITHUB_PROFILE AGENT_GITHUB_REPOSITORY
 
 # Authenticated Git must reject alternate Human credential sources before minting.
@@ -153,6 +159,28 @@ cli_header_output=$(AGENT_GITHUB_PROFILE=claude \
   -c 'http.https://github.com/vnzzzz/example-repo.git/info/refs.extraHeader=Authorization: human-test-token' \
   ls-remote https://github.com/vnzzzz/example-repo.git 2>&1 || true)
 grep -q 'refuses configured Git HTTP Authorization extraHeader' <<<"$cli_header_output"
+
+embedded_url_output=$(AGENT_GITHUB_PROFILE=claude \
+  AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo \
+  /usr/local/lib/agent-dev/auth-bin/git -C "$header_repo" \
+  push https://human:human-test-token@github.com/vnzzzz/example-repo.git HEAD 2>&1 || true)
+grep -q 'refuses HTTP Git URLs with embedded credentials' <<<"$embedded_url_output"
+
+git -C "$header_repo" remote add origin https://github.com/vnzzzz/example-repo.git
+git -C "$header_repo" remote set-url --push origin \
+  https://human:human-test-token@github.com/vnzzzz/example-repo.git
+remote_url_output=$(AGENT_GITHUB_PROFILE=claude \
+  AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo \
+  /usr/local/lib/agent-dev/auth-bin/git -C "$header_repo" push origin HEAD 2>&1 || true)
+grep -q 'refuses HTTP Git URLs with embedded credentials' <<<"$remote_url_output"
+git -C "$header_repo" remote set-url --push origin https://github.com/vnzzzz/example-repo.git
+
+git -C "$header_repo" config alias.publish push
+alias_output=$(AGENT_GITHUB_PROFILE=claude \
+  AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo \
+  /usr/local/lib/agent-dev/auth-bin/git -C "$header_repo" publish origin HEAD 2>&1 || true)
+grep -q "Git alias 'publish' is not supported in GitHub App session" <<<"$alias_output"
+git -C "$header_repo" config --unset alias.publish
 rm -rf "$header_repo"
 
 export AGENT_GITHUB_PROFILE=claude
@@ -173,6 +201,8 @@ grep -Fq 'GH_REPO=' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'GH_PROMPT_DISABLED=1' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'assert_github_com_command_target' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'assert_safe_git_credentials' /usr/local/lib/agent-dev/auth-bin/git
+grep -Fq 'assert_safe_git_urls' /usr/local/lib/agent-dev/auth-bin/git
+grep -Fq 'assert_not_git_alias' /usr/local/lib/agent-dev/auth-bin/git
 grep -Fq 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/git
 grep -Fq 'auth status --json hosts' /usr/local/bin/agent-github-auth

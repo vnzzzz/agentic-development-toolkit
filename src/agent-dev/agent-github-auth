@@ -7,12 +7,12 @@ source /usr/local/lib/agent-dev/github-auth-lib.sh
 usage() {
   cat <<'EOF'
 Usage:
-  agent-github-auth configure <profile> <app-id> <app-slug>
+  agent-github-auth configure <profile> <app-id>
   agent-github-auth status <profile>
   agent-github-auth <profile> [-- <command> [args...]]
 
 Examples:
-  agent-github-auth configure claude 123456 my-claude-agent
+  agent-github-auth configure claude 123456
   cp /path/to/private-key.pem ~/.config/agent-dev/github-apps/claude/private-key.pem
   chmod 600 ~/.config/agent-dev/github-apps/claude/private-key.pem
   agent-github-auth claude
@@ -21,23 +21,22 @@ EOF
 }
 
 configure_profile() {
-  local profile=$1 app_id=$2 app_slug=$3 profile_dir config_path temp_path
+  local profile=$1 app_id=$2 profile_dir config_path temp_path
   agent_github_validate_profile_name "$profile"
   [[ $app_id =~ ^[0-9]+$ ]] || agent_github_die 'app-id must be numeric'
-  [[ $app_slug =~ ^[A-Za-z0-9-]+$ ]] || agent_github_die 'app-slug may contain only letters, digits, and hyphens'
 
   profile_dir=$(agent_github_profile_dir "$profile")
   config_path=$(agent_github_config_path "$profile")
   mkdir -p "$profile_dir"
   chmod 0700 "$HOME/.config/agent-dev" "$HOME/.config/agent-dev/github-apps" "$profile_dir" 2>/dev/null || true
   temp_path=$(mktemp "$profile_dir/.config.XXXXXX")
-  jq -n --argjson app_id "$app_id" --arg app_slug "$app_slug" \
-    '{app_id:$app_id,app_slug:$app_slug}' >"$temp_path"
+  jq -n --argjson app_id "$app_id" '{app_id:$app_id}' >"$temp_path"
   chmod 0600 "$temp_path"
   mv "$temp_path" "$config_path"
 
   printf 'Configured GitHub App profile: %s\n' "$profile"
   printf 'Private key path: %s\n' "$(agent_github_key_path "$profile")"
+  printf 'The App slug and bot identity are derived from authenticated App metadata.\n'
   printf 'Place the private key there and set mode 0600 before activation.\n'
 }
 
@@ -50,7 +49,9 @@ status_profile() {
   agent_github_current_repo
   agent_github_bot_identity "$profile"
   token=$(agent_github_mint_token "$profile")
-  agent_github_revoke_token "$token" >/dev/null 2>&1 || true
+  if ! agent_github_revoke_token "$token" >/dev/null 2>&1; then
+    agent_github_die 'repository-scoped installation token was minted but could not be revoked'
+  fi
 
   printf 'Profile: %s\n' "$profile"
   printf 'App: %s (ID %s)\n' "$AGENT_GITHUB_APP_SLUG" "$AGENT_GITHUB_APP_ID"
@@ -81,9 +82,11 @@ activate_profile() {
   agent_github_bot_identity "$profile"
 
   # Fail closed before entering the session if the App is not installed for the
-  # current repository or a repository-scoped token cannot be minted.
+  # current repository or a repository-scoped token cannot complete its lifecycle.
   token=$(agent_github_mint_token "$profile")
-  agent_github_revoke_token "$token" >/dev/null 2>&1 || true
+  if ! agent_github_revoke_token "$token" >/dev/null 2>&1; then
+    agent_github_die 'preflight installation token was minted but could not be revoked'
+  fi
 
   export AGENT_GITHUB_PROFILE=$profile
   export AGENT_GITHUB_REPOSITORY=$AGENT_GITHUB_REPO_FULL_NAME
@@ -125,11 +128,11 @@ activate_profile() {
 
 case ${1:-} in
   configure)
-    [[ $# -eq 4 ]] || {
+    [[ $# -eq 3 ]] || {
       usage >&2
       exit 2
     }
-    configure_profile "$2" "$3" "$4"
+    configure_profile "$2" "$3"
     ;;
   status)
     [[ $# -eq 2 ]] || {

@@ -80,10 +80,43 @@ add_git_config() {
   export GIT_CONFIG_COUNT=$((index + 1))
 }
 
+assert_exclusive_app_credentials() {
+  local real_gh=/usr/local/lib/agent-dev/real-bin/gh
+  local variable auth_json
+
+  # An App session must not coexist with a caller-provided GitHub token. Its
+  # provenance cannot be proven here, so refuse rather than silently shadow it.
+  for variable in GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN; do
+    if [[ -n ${!variable:-} ]]; then
+      agent_github_die "ambient GitHub credential is set in $variable; unset it before starting a GitHub App session"
+    fi
+  done
+
+  [[ -x $real_gh ]] || agent_github_die "real gh binary is unavailable: $real_gh"
+  if ! auth_json=$(env \
+    -u GH_TOKEN \
+    -u GITHUB_TOKEN \
+    -u GH_ENTERPRISE_TOKEN \
+    -u GITHUB_ENTERPRISE_TOKEN \
+    -u GH_HOST \
+    -u GH_REPO \
+    "$real_gh" auth status --json hosts 2>/dev/null); then
+    agent_github_die 'cannot verify persistent GitHub CLI authentication state before App session activation'
+  fi
+  jq -e '.hosts // {}' <<<"$auth_json" >/dev/null 2>&1 || \
+    agent_github_die 'cannot parse persistent GitHub CLI authentication state before App session activation'
+  if jq -e '(.hosts // {}) | length > 0' <<<"$auth_json" >/dev/null; then
+    agent_github_die 'stored GitHub CLI authentication is present; log out or use a Dev Container without Human gh credentials before starting a GitHub App session'
+  fi
+}
+
 activate_profile() {
   local profile=$1
   shift
   local token shell_bin repository
+
+  # Enforce an exclusive App-authenticated identity before touching the App key.
+  assert_exclusive_app_credentials
 
   agent_github_load_profile "$profile"
   agent_github_validate_private_key "$AGENT_GITHUB_KEY_PATH"
@@ -130,9 +163,8 @@ activate_profile() {
   export SSH_ASKPASS=/bin/false
 
   # App-authenticated gh commands use an isolated temporary GH_CONFIG_DIR in
-  # auth-bin/gh. Clear inherited host/repository/token selectors here as well so
-  # child processes cannot accidentally inherit a Human gh target.
-  unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN GH_HOST GH_REPO
+  # auth-bin/gh. Clear inherited host/repository selectors here as well.
+  unset GH_HOST GH_REPO
 
   printf 'GitHub App session: %s as %s for %s\n' \
     "$profile" "$AGENT_GITHUB_BOT_LOGIN" "$repository"

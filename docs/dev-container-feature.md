@@ -83,7 +83,7 @@ agent-github-auth claude
 agent-github-auth codex -- codex
 ```
 
-session内では`gh`とGit HTTPS credentialがGitHub Appのrepo-scoped Installation Tokenを必要時に取得し、Git Author / Committerも同じApp botへ設定されます。Human GitHub credentialへのfallbackは行いません。
+session内では`gh`がcommandごとにrepo-scoped Installation Tokenを利用し、`git fetch` / `pull` / `push` / `ls-remote`はGit process全体で1つのtokenを利用して終了後にbest-effortでrevokeします。Git Author / Committerも同じApp botへ設定され、Human GitHub credentialへのfallbackは行いません。
 
 private keyはnamed volumeへ保存せず、Dev Container rebuildで消えます。詳細なpermissions、credential lifecycle、repository scope、Ruleset要件は[GitHub Agent identity](github-agent-identity.md)を参照し、trust boundaryは[SECURITY.md](../SECURITY.md)を正本とします。
 

@@ -47,36 +47,39 @@ resolve_subcommand() {
   return 1
 }
 
-assert_no_git_authorization_extraheader() {
+assert_safe_git_credentials() {
   local output status line value lower
 
-  # Query the effective configuration using the same global options (-C, -c,
-  # --config-env, --git-dir, ... ) that the wrapped invocation will use. This
-  # detects Authorization headers at any URL specificity, including service
-  # paths such as .../info/refs, instead of trying to out-specify every possible
-  # http.<url>.extraHeader key with more reset entries.
-  if output=$("$real_git" "${git_global_args[@]}" config --get-regexp '^[Hh][Tt][Tt][Pp]\..*\.[Ee][Xx][Tt][Rr][Aa][Hh][Ee][Aa][Dd][Ee][Rr]$' 2>/dev/null); then
+  # URL-specific config can outrank session defaults. Inspect every effective
+  # credential source before minting a token instead of chasing path specificity.
+  if output=$("$real_git" "${git_global_args[@]}" config --get-regexp \
+    '(^[Hh][Tt][Tt][Pp]\..*\.[Ee][Xx][Tt][Rr][Aa][Hh][Ee][Aa][Dd][Ee][Rr]$)|(^[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll](\..*)?\.[Hh][Ee][Ll][Pp][Ee][Rr]$)' \
+    2>/dev/null); then
     while IFS= read -r line; do
       value=${line#* }
       lower=${value,,}
-      if [[ $lower =~ ^[[:space:]]*authorization[[:space:]]*: ]]; then
-        agent_github_die 'GitHub App session refuses configured Git HTTP Authorization extraHeader; remove it before authenticated Git operations'
-      fi
+      case "$line" in
+        [Hh][Tt][Tt][Pp].*)
+          [[ $lower =~ ^[[:space:]]*authorization[[:space:]]*: ]] && \
+            agent_github_die 'GitHub App session refuses configured Git HTTP Authorization extraHeader'
+          ;;
+        [Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll].*)
+          if [[ -n $value && $value != '!agent-github-credential' ]]; then
+            agent_github_die 'GitHub App session refuses configured Git credential helper'
+          fi
+          ;;
+      esac
     done <<<"$output"
   else
     status=$?
-    # git config exits 1 when no matching key exists. Any other failure means
-    # we cannot prove the effective HTTP authorization configuration is safe.
-    [[ $status -eq 1 ]] || agent_github_die 'cannot validate Git HTTP extraHeader configuration before authenticated operation'
+    [[ $status -eq 1 ]] || agent_github_die 'cannot validate Git credential configuration before authenticated operation'
   fi
 }
 
 subcommand=$(resolve_subcommand "$@" || true)
 case "$subcommand" in
   fetch|pull|push|ls-remote)
-    # Validate before minting the token. This also catches caller-supplied -c or
-    # --config-env Authorization headers and repo/service-path-specific entries.
-    assert_no_git_authorization_extraheader
+    assert_safe_git_credentials
 
     token=
     cleanup() {

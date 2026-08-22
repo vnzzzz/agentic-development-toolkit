@@ -7,6 +7,7 @@ SHELL_SCRIPTS := \
 	src/agent-dev/agent-github-auth \
 	src/agent-dev/agent-github-credential \
 	src/agent-dev/auth-bin/gh \
+	src/agent-dev/auth-bin/git \
 	scripts/check-release-version.sh \
 	test/agent-dev/test.sh \
 	test/release-version-check.sh

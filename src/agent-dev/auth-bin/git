@@ -47,10 +47,10 @@ resolve_subcommand() {
 }
 
 assert_not_git_alias() {
-  local alias_value status
+  local status
   [[ -n $subcommand ]] || return 0
 
-  if alias_value=$("$real_git" "${git_global_args[@]}" config --get "alias.$subcommand" 2>/dev/null); then
+  if "$real_git" "${git_global_args[@]}" config --get "alias.$subcommand" >/dev/null 2>&1; then
     agent_github_die "Git alias '$subcommand' is not supported in GitHub App session; use the canonical git command"
   else
     status=$?

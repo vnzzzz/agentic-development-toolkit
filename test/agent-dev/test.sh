@@ -122,6 +122,32 @@ chmod 0755 "$fake_bin/curl"
 [[ $(PATH="$fake_bin:$PATH" agent_github_curl --version) == -q ]]
 rm -rf "$fake_bin"
 
+# A repository-specific Human Authorization header is more specific than host
+# defaults. Verify that the environment-level exact repository/.git resets used
+# by the App session make Git's effective URL-matched extraHeader empty.
+header_repo=$(mktemp -d)
+git -C "$header_repo" init -q
+git -C "$header_repo" config --local \
+  'http.https://github.com/vnzzzz/example-repo.extraHeader' \
+  'Authorization: human-test-token'
+git -C "$header_repo" config --local \
+  'http.https://github.com/vnzzzz/example-repo.git.extraHeader' \
+  'Authorization: human-test-token'
+effective_header=$(env \
+  GIT_CONFIG_COUNT=4 \
+  GIT_CONFIG_KEY_0=http.extraHeader \
+  GIT_CONFIG_VALUE_0= \
+  GIT_CONFIG_KEY_1=http.https://github.com/.extraHeader \
+  GIT_CONFIG_VALUE_1= \
+  GIT_CONFIG_KEY_2=http.https://github.com/vnzzzz/example-repo.extraHeader \
+  GIT_CONFIG_VALUE_2= \
+  GIT_CONFIG_KEY_3=http.https://github.com/vnzzzz/example-repo.git.extraHeader \
+  GIT_CONFIG_VALUE_3= \
+  git -C "$header_repo" config --get-urlmatch \
+  http.extraHeader https://github.com/vnzzzz/example-repo.git || true)
+[[ -z $effective_header ]]
+rm -rf "$header_repo"
+
 # Credential helper only returns the process-local token for the exact frozen
 # GitHub.com repository path. Missing path, another repo, or Enterprise host
 # must not receive a credential.

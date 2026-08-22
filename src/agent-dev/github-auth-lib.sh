@@ -187,7 +187,7 @@ agent_github_bot_identity() {
     agent_github_die "cannot resolve GitHub App bot user for authenticated App slug: $app_slug"
   bot_id=$(jq -er '.id' <<<"$user_response") || agent_github_die "bot user response did not contain an id"
   bot_login=$(jq -er '.login' <<<"$user_response") || agent_github_die "bot user response did not contain a login"
-  expected_login=${app_slug}[bot]
+  expected_login="${app_slug}[bot]"
   [[ $bot_login == "$expected_login" ]] || \
     agent_github_die "bot login mismatch for authenticated App: expected $expected_login, returned $bot_login"
 

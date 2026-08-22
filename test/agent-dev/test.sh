@@ -30,7 +30,6 @@ command -v agent-github-credential >/dev/null
 [[ -x /usr/local/lib/agent-dev/real-bin/git ]]
 agent-github-auth --help >/dev/null
 
-# The auth library is GitHub.com-only and must not accept an inherited API host.
 export AGENT_GITHUB_API_URL=https://example.invalid
 # shellcheck source=/dev/null
 source /usr/local/lib/agent-dev/github-auth-lib.sh
@@ -45,7 +44,6 @@ if (agent_github_set_repo_full_name 'vnzzzz/example/repo') >/dev/null 2>&1; then
   exit 1
 fi
 
-# Plain HTTP origins are intentionally rejected before any credential is used.
 tmp_repo=$(mktemp -d)
 trap 'rm -rf "$tmp_repo"' EXIT
 git -C "$tmp_repo" init -q
@@ -63,15 +61,13 @@ config_path="$profile_dir/config.json"
 [[ -f $config_path ]]
 [[ $(jq -r '.app_id' "$config_path") == 123456 ]]
 if jq -e 'has("app_slug")' "$config_path" >/dev/null; then
-  echo 'ERROR: GitHub App slug must be derived from authenticated App metadata, not stored in profile config.' >&2
+  echo 'ERROR: GitHub App slug must not be stored in profile config.' >&2
   exit 1
 fi
 
-# App activation refuses ambient caller credentials before trying the private key.
 ambient_output=$(GH_TOKEN=human-test-token agent-github-auth claude -- true 2>&1 || true)
 grep -q 'ambient GitHub credential is set in GH_TOKEN' <<<"$ambient_output"
 
-# Profile directories and private keys must not be symlink escapes.
 symlink_target=$(mktemp -d)
 ln -s "$symlink_target" "$HOME/.config/agent-dev/github-apps/symlink-profile"
 if agent-github-auth configure symlink-profile 123456 >/dev/null 2>&1; then
@@ -81,8 +77,6 @@ fi
 rm "$HOME/.config/agent-dev/github-apps/symlink-profile"
 rm -rf "$symlink_target"
 
-# Re-check every path component during load: replacing a configured profile
-# directory with a symlink after configure must still fail closed.
 profile_backup=$(mktemp -d)
 profile_redirect=$(mktemp -d)
 rmdir "$profile_backup"
@@ -111,8 +105,6 @@ if agent-github-auth claude -- true >/dev/null 2>&1; then
   exit 1
 fi
 
-# curl configuration must never precede the library's security options. A fake
-# curl verifies that -q is the first option supplied by the shared helper.
 fake_bin=$(mktemp -d)
 cat >"$fake_bin/curl" <<'EOF'
 #!/usr/bin/env bash
@@ -122,8 +114,6 @@ chmod 0755 "$fake_bin/curl"
 [[ $(PATH="$fake_bin:$PATH" agent_github_curl --version) == -q ]]
 rm -rf "$fake_bin"
 
-# GH_TOKEN is also accepted for ghe.com. Explicit CLI host/repository selectors
-# must therefore be rejected before the wrapper mints or exports an App token.
 export AGENT_GITHUB_PROFILE=claude
 export AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo
 ghe_host_output=$(/usr/local/lib/agent-dev/auth-bin/gh api --hostname tenant.ghe.com /user 2>&1 || true)
@@ -132,9 +122,7 @@ ghe_repo_output=$(/usr/local/lib/agent-dev/auth-bin/gh repo view -R tenant.ghe.c
 grep -q 'refuses non-github.com repository host' <<<"$ghe_repo_output"
 unset AGENT_GITHUB_PROFILE AGENT_GITHUB_REPOSITORY
 
-# Do not try to out-specify arbitrary http.<url>.extraHeader entries. Before any
-# token is minted, reject Authorization headers from the effective Git config,
-# including service-path-specific and caller-supplied command-scope values.
+# Authenticated Git must reject alternate Human credential sources before minting.
 header_repo=$(mktemp -d)
 git -C "$header_repo" init -q
 git -C "$header_repo" config --local \
@@ -147,6 +135,18 @@ header_output=$(AGENT_GITHUB_PROFILE=claude \
 grep -q 'refuses configured Git HTTP Authorization extraHeader' <<<"$header_output"
 git -C "$header_repo" config --unset-all \
   'http.https://github.com/vnzzzz/example-repo.git/info/refs.extraHeader'
+
+git -C "$header_repo" config --local \
+  'credential.https://github.com/vnzzzz/example-repo.git.helper' \
+  '!human-helper'
+helper_output=$(AGENT_GITHUB_PROFILE=claude \
+  AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo \
+  /usr/local/lib/agent-dev/auth-bin/git -C "$header_repo" \
+  ls-remote https://github.com/vnzzzz/example-repo.git 2>&1 || true)
+grep -q 'refuses configured Git credential helper' <<<"$helper_output"
+git -C "$header_repo" config --unset-all \
+  'credential.https://github.com/vnzzzz/example-repo.git.helper'
+
 cli_header_output=$(AGENT_GITHUB_PROFILE=claude \
   AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo \
   /usr/local/lib/agent-dev/auth-bin/git -C "$header_repo" \
@@ -155,9 +155,6 @@ cli_header_output=$(AGENT_GITHUB_PROFILE=claude \
 grep -q 'refuses configured Git HTTP Authorization extraHeader' <<<"$cli_header_output"
 rm -rf "$header_repo"
 
-# Credential helper only returns the process-local token for the exact frozen
-# GitHub.com repository path. Missing path, another repo, or Enterprise host
-# must not receive a credential.
 export AGENT_GITHUB_PROFILE=claude
 export AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo
 export AGENT_GITHUB_GIT_TOKEN=test-installation-token
@@ -169,19 +166,16 @@ grep -q '^password=test-installation-token$' <<<"$credential"
 [[ -z $(printf 'protocol=https\nhost=ghe.example\npath=vnzzzz/example-repo.git\n\n' | agent-github-credential get) ]]
 unset AGENT_GITHUB_PROFILE AGENT_GITHUB_REPOSITORY AGENT_GITHUB_GIT_TOKEN
 
-# Keep these invariants visible in the installed wrappers. Live token behavior is
-# covered by the merge-precondition E2E in Issue #32.
 grep -Fq 'mktemp -d' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'GH_CONFIG_DIR=' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'GH_HOST=github.com' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'GH_REPO=' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'GH_PROMPT_DISABLED=1' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'assert_github_com_command_target' /usr/local/lib/agent-dev/auth-bin/gh
-grep -Fq 'assert_no_git_authorization_extraheader' /usr/local/lib/agent-dev/auth-bin/git
+grep -Fq 'assert_safe_git_credentials' /usr/local/lib/agent-dev/auth-bin/git
 grep -Fq 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/gh
 grep -Fq 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/git
 grep -Fq 'auth status --json hosts' /usr/local/bin/agent-github-auth
-grep -Fq 'repo_http_url=' /usr/local/bin/agent-github-auth
 grep -Fq 'agent_github_curl --fail' /usr/local/lib/agent-dev/github-auth-lib.sh
 grep -Fq "command curl -q --proto '=https'" /usr/local/lib/agent-dev/github-auth-lib.sh
 

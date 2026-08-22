@@ -30,12 +30,32 @@ command -v agent-github-credential >/dev/null
 [[ -x /usr/local/lib/agent-dev/real-bin/git ]]
 agent-github-auth --help >/dev/null
 
+# The auth library is GitHub.com-only and must not accept an inherited API host.
+export AGENT_GITHUB_API_URL=https://example.invalid
 # shellcheck source=/dev/null
 source /usr/local/lib/agent-dev/github-auth-lib.sh
+[[ $AGENT_GITHUB_API_URL == https://api.github.com ]]
+
 agent_github_set_repo_full_name 'vnzzzz/example-repo'
 [[ $AGENT_GITHUB_REPO_OWNER == vnzzzz ]]
 [[ $AGENT_GITHUB_REPO_NAME == example-repo ]]
 [[ $AGENT_GITHUB_REPO_FULL_NAME == vnzzzz/example-repo ]]
+if (agent_github_set_repo_full_name 'vnzzzz/example/repo') >/dev/null 2>&1; then
+  echo 'ERROR: repository parser accepted a multi-segment repository path.' >&2
+  exit 1
+fi
+
+# Plain HTTP origins are intentionally rejected before any credential is used.
+tmp_repo=$(mktemp -d)
+trap 'rm -rf "$tmp_repo"' EXIT
+git -C "$tmp_repo" init -q
+git -C "$tmp_repo" remote add origin http://github.com/vnzzzz/example-repo.git
+if (cd "$tmp_repo" && agent_github_current_repo) >/dev/null 2>&1; then
+  echo 'ERROR: insecure HTTP GitHub origin was accepted.' >&2
+  exit 1
+fi
+rm -rf "$tmp_repo"
+trap - EXIT
 
 agent-github-auth configure claude 123456 >/dev/null
 config_path="$HOME/.config/agent-dev/github-apps/claude/config.json"
@@ -46,9 +66,51 @@ if jq -e 'has("app_slug")' "$config_path" >/dev/null; then
   exit 1
 fi
 
+# Profile directories and private keys must not be symlink escapes.
+symlink_target=$(mktemp -d)
+ln -s "$symlink_target" "$HOME/.config/agent-dev/github-apps/symlink-profile"
+if agent-github-auth configure symlink-profile 123456 >/dev/null 2>&1; then
+  echo 'ERROR: symlinked GitHub App profile directory was accepted.' >&2
+  exit 1
+fi
+rm "$HOME/.config/agent-dev/github-apps/symlink-profile"
+rm -rf "$symlink_target"
+
+key_target=$(mktemp)
+chmod 0600 "$key_target"
+ln -s "$key_target" "$HOME/.config/agent-dev/github-apps/claude/private-key.pem"
+if (agent_github_validate_private_key "$HOME/.config/agent-dev/github-apps/claude/private-key.pem") >/dev/null 2>&1; then
+  echo 'ERROR: symlinked GitHub App private key was accepted.' >&2
+  exit 1
+fi
+rm "$HOME/.config/agent-dev/github-apps/claude/private-key.pem" "$key_target"
+
 if agent-github-auth claude -- true >/dev/null 2>&1; then
   echo 'ERROR: GitHub App auth must fail closed when the private key is not configured.' >&2
   exit 1
 fi
+
+# Credential helper only returns the process-local token for the exact frozen
+# GitHub.com repository path. Missing path, another repo, or Enterprise host
+# must not receive a credential.
+export AGENT_GITHUB_PROFILE=claude
+export AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo
+export AGENT_GITHUB_GIT_TOKEN=test-installation-token
+credential=$(printf 'protocol=https\nhost=github.com\npath=vnzzzz/example-repo.git\n\n' | agent-github-credential get)
+grep -q '^username=x-access-token$' <<<"$credential"
+grep -q '^password=test-installation-token$' <<<"$credential"
+[[ -z $(printf 'protocol=https\nhost=github.com\n\n' | agent-github-credential get) ]]
+[[ -z $(printf 'protocol=https\nhost=github.com\npath=vnzzzz/other-repo.git\n\n' | agent-github-credential get) ]]
+[[ -z $(printf 'protocol=https\nhost=ghe.example\npath=vnzzzz/example-repo.git\n\n' | agent-github-credential get) ]]
+unset AGENT_GITHUB_PROFILE AGENT_GITHUB_REPOSITORY AGENT_GITHUB_GIT_TOKEN
+
+# Keep these invariants visible in the installed wrappers. Live token behavior is
+# covered by the merge-precondition E2E in Issue #32.
+grep -q 'GH_CONFIG_DIR="$config_dir"' /usr/local/lib/agent-dev/auth-bin/gh
+grep -q 'GH_HOST=github.com' /usr/local/lib/agent-dev/auth-bin/gh
+grep -q 'GH_REPO="$repository"' /usr/local/lib/agent-dev/auth-bin/gh
+grep -q 'GH_PROMPT_DISABLED=1' /usr/local/lib/agent-dev/auth-bin/gh
+grep -q 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/gh
+grep -q 'trap cleanup EXIT' /usr/local/lib/agent-dev/auth-bin/git
 
 printf 'agent-dev Feature validation passed.\n'

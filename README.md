@@ -18,7 +18,7 @@ Claude CodeとCodexを使う開発環境を共通化するためのDev Container
 }
 ```
 
-`.devcontainer-lock.json`もGitで管理することで、利用するFeatureのversion / digestを固定できます。提供されるツールとバージョン方針は[共通Dev Container Feature](docs/dev-container-feature.md)を参照してください。
+`.devcontainer-lock.json`もGitで管理することで、利用するFeatureのバージョンとdigestを固定できます。提供されるツールとバージョン方針は[共通Dev Container Feature](docs/dev-container-feature.md)を参照してください。
 
 ## GitHub操作をエージェントごとに分ける
 

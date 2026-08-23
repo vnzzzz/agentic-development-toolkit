@@ -60,6 +60,7 @@ assert_not_git_alias() {
 
 assert_safe_git_credentials() {
   local output status line value lower
+  local -a active_helpers=()
 
   if output=$("$real_git" "${git_global_args[@]}" config --get-regexp \
     '(^[Hh][Tt][Tt][Pp]\..*\.[Ee][Xx][Tt][Rr][Aa][Hh][Ee][Aa][Dd][Ee][Rr]$)|(^[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll](\..*)?\.[Hh][Ee][Ll][Pp][Ee][Rr]$)' \
@@ -73,8 +74,11 @@ assert_safe_git_credentials() {
             agent_github_die 'GitHub App session refuses configured Git HTTP Authorization extraHeader'
           ;;
         [Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll].*)
-          if [[ -n $value && $value != '!agent-github-credential' ]]; then
-            agent_github_die 'GitHub App session refuses configured Git credential helper'
+          if [[ -z $value ]]; then
+            # An empty credential.helper resets all helpers accumulated before it.
+            active_helpers=()
+          else
+            active_helpers+=("$value")
           fi
           ;;
       esac
@@ -83,6 +87,13 @@ assert_safe_git_credentials() {
     status=$?
     [[ $status -eq 1 ]] || agent_github_die 'cannot validate Git credential configuration before authenticated operation'
   fi
+
+  [[ ${#active_helpers[@]} -gt 0 ]] || \
+    agent_github_die 'GitHub App credential helper is not active for authenticated Git operation'
+  for value in "${active_helpers[@]}"; do
+    [[ $value == '!agent-github-credential' ]] || \
+      agent_github_die 'GitHub App session refuses configured Git credential helper'
+  done
 }
 
 assert_no_embedded_http_credentials() {

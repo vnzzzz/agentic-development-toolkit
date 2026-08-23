@@ -2,7 +2,7 @@
 
 Claude CodeとCodexを使う開発環境を共通化するDev Container Feature `agent-dev`を管理するリポジトリです。
 
-`agent-dev`は、Claude Code / Codex CLI、GitHub CLI、[agent-skills](https://github.com/vnzzzz/agent-skills)、GitHub App認証用コマンドなどを共通構成でDev Containerへ導入・設定します。プロジェクト固有のランタイムや依存関係、サービス設定は各プロジェクトで管理します。
+`agent-dev`は、Claude Code / Codex CLI、GitHub CLI、[vnzzzz/agent-skills](https://github.com/vnzzzz/agent-skills)、GitHub App認証用コマンドなどを共通構成でDev Containerへ導入・設定します。プロジェクト固有のランタイムや依存関係、サービス設定は各プロジェクトで管理します。
 
 ## プロジェクトで利用する
 

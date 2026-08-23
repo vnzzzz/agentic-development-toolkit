@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# shellcheck source=/dev/null
+source /usr/local/lib/agent-dev/github-auth-lib.sh
+
+real_git=/usr/local/lib/agent-dev/real-bin/git
+[[ -x $real_git ]] || agent_github_die "real git binary is unavailable: $real_git"
+
+profile=${AGENT_GITHUB_PROFILE:-}
+if [[ -z $profile ]]; then
+  exec "$real_git" "$@"
+fi
+repository=${AGENT_GITHUB_REPOSITORY:-}
+[[ -n $repository ]] || agent_github_die 'AGENT_GITHUB_REPOSITORY is not set in authenticated GitHub App session'
+agent_github_set_repo_full_name "$repository"
+
+git_global_args=()
+subcommand=
+resolve_subcommand() {
+  local -a args=("$@")
+  local i arg
+
+  for ((i = 0; i < ${#args[@]}; i++)); do
+    arg=${args[$i]}
+    case "$arg" in
+      -C|-c|--git-dir|--work-tree|--namespace|--config-env|--exec-path)
+        ((i + 1 < ${#args[@]})) || agent_github_die "git global option requires a value: $arg"
+        git_global_args+=("$arg" "${args[$((i + 1))]}")
+        ((i += 1))
+        ;;
+      --git-dir=*|--work-tree=*|--namespace=*|--config-env=*|--exec-path=*)
+        git_global_args+=("$arg")
+        ;;
+      --bare|--no-pager|--paginate|--literal-pathspecs|--no-literal-pathspecs|--glob-pathspecs|--noglob-pathspecs|--icase-pathspecs|--no-optional-locks)
+        git_global_args+=("$arg")
+        ;;
+      -*)
+        git_global_args+=("$arg")
+        ;;
+      *)
+        subcommand=$arg
+        return 0
+        ;;
+    esac
+  done
+}
+
+assert_not_git_alias() {
+  local status
+  [[ -n $subcommand ]] || return 0
+
+  if "$real_git" "${git_global_args[@]}" config --get "alias.$subcommand" >/dev/null 2>&1; then
+    agent_github_die "Git alias '$subcommand' is not supported in GitHub App session; use the canonical git command"
+  else
+    status=$?
+    [[ $status -eq 1 ]] || agent_github_die "cannot determine whether Git subcommand '$subcommand' is an alias"
+  fi
+}
+
+assert_safe_git_credentials() {
+  local output status line value lower
+  local -a active_helpers=()
+
+  if output=$("$real_git" "${git_global_args[@]}" config --get-regexp \
+    '(^[Hh][Tt][Tt][Pp]\..*\.[Ee][Xx][Tt][Rr][Aa][Hh][Ee][Aa][Dd][Ee][Rr]$)|(^[Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll](\..*)?\.[Hh][Ee][Ll][Pp][Ee][Rr]$)' \
+    2>/dev/null); then
+    while IFS= read -r line; do
+      value=${line#* }
+      lower=${value,,}
+      case "$line" in
+        [Hh][Tt][Tt][Pp].*)
+          [[ $lower =~ ^[[:space:]]*authorization[[:space:]]*: ]] && \
+            agent_github_die 'GitHub App session refuses configured Git HTTP Authorization extraHeader'
+          ;;
+        [Cc][Rr][Ee][Dd][Ee][Nn][Tt][Ii][Aa][Ll].*)
+          if [[ -z $value ]]; then
+            # An empty credential.helper resets all helpers accumulated before it.
+            active_helpers=()
+          else
+            active_helpers+=("$value")
+          fi
+          ;;
+      esac
+    done <<<"$output"
+  else
+    status=$?
+    [[ $status -eq 1 ]] || agent_github_die 'cannot validate Git credential configuration before authenticated operation'
+  fi
+
+  [[ ${#active_helpers[@]} -gt 0 ]] || \
+    agent_github_die 'GitHub App credential helper is not active for authenticated Git operation'
+  for value in "${active_helpers[@]}"; do
+    [[ $value == '!agent-github-credential' ]] || \
+      agent_github_die 'GitHub App session refuses configured Git credential helper'
+  done
+}
+
+assert_no_embedded_http_credentials() {
+  local value=$1 authority
+  case "$value" in
+    http://*|https://*)
+      authority=${value#*://}
+      authority=${authority%%/*}
+      [[ $authority != *@* ]] || agent_github_die 'GitHub App session refuses HTTP Git URLs with embedded credentials'
+      ;;
+  esac
+}
+
+assert_safe_git_urls() {
+  local output status line key value base arg
+
+  for arg in "$@"; do
+    assert_no_embedded_http_credentials "$arg"
+  done
+
+  if output=$("$real_git" "${git_global_args[@]}" config --get-regexp \
+    '(^remote\..*\.(url|pushurl)$)|(^url\..*\.(insteadof|pushinsteadof)$)' 2>/dev/null); then
+    while IFS= read -r line; do
+      key=${line%% *}
+      value=${line#* }
+      case "${key,,}" in
+        remote.*.url|remote.*.pushurl)
+          assert_no_embedded_http_credentials "$value"
+          ;;
+        url.*.insteadof|url.*.pushinsteadof)
+          base=${key#url.}
+          base=${base%.*}
+          assert_no_embedded_http_credentials "$base"
+          ;;
+      esac
+    done <<<"$output"
+  else
+    status=$?
+    [[ $status -eq 1 ]] || agent_github_die 'cannot validate Git transport URLs before authenticated operation'
+  fi
+}
+
+resolve_subcommand "$@"
+assert_not_git_alias
+
+case "$subcommand" in
+  fetch|pull|push|ls-remote)
+    assert_safe_git_credentials
+    assert_safe_git_urls "$@"
+
+    token=
+    cleanup() {
+      unset AGENT_GITHUB_GIT_TOKEN
+      if [[ -n $token ]]; then
+        agent_github_revoke_token "$token" >/dev/null 2>&1 || true
+        token=
+      fi
+    }
+    trap cleanup EXIT
+
+    token=$(agent_github_mint_token "$profile" "$repository")
+    export AGENT_GITHUB_GIT_TOKEN=$token
+
+    set +e
+    "$real_git" "$@"
+    status=$?
+    set -e
+
+    trap - EXIT
+    cleanup
+    exit "$status"
+    ;;
+  *)
+    exec "$real_git" "$@"
+    ;;
+esac

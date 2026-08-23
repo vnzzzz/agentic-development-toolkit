@@ -1,6 +1,6 @@
 {
   "id": "agent-dev",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Agent Development Environment",
   "description": "Installs and configures the shared Claude Code, Codex, GitHub CLI, and agent-skills development environment.",
   "documentationURL": "https://github.com/vnzzzz/agentic-development-toolkit/blob/main/docs/dev-container-feature.md",

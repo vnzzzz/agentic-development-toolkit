@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# shellcheck source=/dev/null
+source /usr/local/lib/agent-dev/github-auth-lib.sh
+
+real_gh=/usr/local/lib/agent-dev/real-bin/gh
+[[ -x $real_gh ]] || agent_github_die "real gh binary is unavailable: $real_gh"
+
+profile=${AGENT_GITHUB_PROFILE:-}
+if [[ -z $profile ]]; then
+  exec "$real_gh" "$@"
+fi
+repository=${AGENT_GITHUB_REPOSITORY:-}
+[[ -n $repository ]] || agent_github_die 'AGENT_GITHUB_REPOSITORY is not set in authenticated GitHub App session'
+agent_github_set_repo_full_name "$repository"
+
+assert_github_com_url() {
+  local value=$1 host
+  case "$value" in
+    https://*|http://*|ssh://*)
+      host=${value#*://}
+      host=${host%%/*}
+      host=${host##*@}
+      host=${host%%:*}
+      [[ $host == github.com ]] || agent_github_die "GitHub App session refuses non-github.com target: $host"
+      ;;
+  esac
+}
+
+assert_github_com_repo_selector() {
+  local value=$1 host
+  assert_github_com_url "$value"
+
+  if [[ $value == */*/* ]]; then
+    host=${value%%/*}
+    if [[ $host == *.* || $host == *:* ]]; then
+      [[ $host == github.com ]] || agent_github_die "GitHub App session refuses non-github.com repository host: $host"
+    fi
+  fi
+}
+
+assert_github_com_command_target() {
+  local -a args=("$@")
+  local i arg value auth_hostname_short=0
+
+  if [[ ${args[0]:-} == auth ]]; then
+    case ${args[1]:-} in
+      login|logout|refresh|status|switch|token)
+        auth_hostname_short=1
+        ;;
+    esac
+    # Returning the process-local Installation Token defeats the wrapper's
+    # non-persistence model and is not needed by the supported workflow.
+    [[ ${args[1]:-} != token ]] || agent_github_die 'gh auth token is disabled in GitHub App session'
+  fi
+
+  for ((i = 0; i < ${#args[@]}; i++)); do
+    arg=${args[$i]}
+    case "$arg" in
+      --hostname)
+        ((i + 1 < ${#args[@]})) || agent_github_die '--hostname requires a value'
+        value=${args[$((i + 1))]}
+        [[ $value == github.com ]] || agent_github_die "GitHub App session refuses non-github.com --hostname target: $value"
+        ((i += 1))
+        ;;
+      --hostname=*)
+        value=${arg#--hostname=}
+        [[ $value == github.com ]] || agent_github_die "GitHub App session refuses non-github.com --hostname target: $value"
+        ;;
+      -h)
+        if ((auth_hostname_short)); then
+          ((i + 1 < ${#args[@]})) || agent_github_die '-h requires a hostname value for this gh auth command'
+          value=${args[$((i + 1))]}
+          [[ $value == github.com ]] || agent_github_die "GitHub App session refuses non-github.com -h target: $value"
+          ((i += 1))
+        fi
+        ;;
+      -h?*)
+        if ((auth_hostname_short)); then
+          value=${arg#-h}
+          value=${value#=}
+          [[ $value == github.com ]] || agent_github_die "GitHub App session refuses non-github.com -h target: $value"
+        fi
+        ;;
+      -R|--repo)
+        ((i + 1 < ${#args[@]})) || agent_github_die "$arg requires a value"
+        assert_github_com_repo_selector "${args[$((i + 1))]}"
+        ((i += 1))
+        ;;
+      -R?*)
+        value=${arg#-R}
+        value=${value#=}
+        assert_github_com_repo_selector "$value"
+        ;;
+      --repo=*)
+        assert_github_com_repo_selector "${arg#--repo=}"
+        ;;
+      https://*|http://*|ssh://*)
+        assert_github_com_url "$arg"
+        ;;
+    esac
+  done
+
+  if [[ ${args[0]:-} == repo ]]; then
+    case ${args[1]:-} in
+      archive|clone|delete|edit|fork|set-default|sync|unarchive|view)
+        for arg in "${args[@]:2}"; do
+          [[ $arg == -* ]] && continue
+          [[ $arg == */*/* ]] && assert_github_com_repo_selector "$arg"
+        done
+        ;;
+    esac
+  fi
+}
+
+# GH_TOKEN is eligible for ghe.com hosts, so explicit targets must be validated
+# before the Installation Token exists.
+assert_github_com_command_target "$@"
+
+config_dir=$(mktemp -d "${TMPDIR:-/tmp}/agent-github-gh.XXXXXX")
+chmod 0700 "$config_dir"
+token=
+cleanup() {
+  if [[ -n $token ]]; then
+    agent_github_revoke_token "$token" >/dev/null 2>&1 || true
+    token=
+  fi
+  rm -rf "$config_dir"
+}
+trap cleanup EXIT
+
+token=$(agent_github_mint_token "$profile" "$repository")
+set +e
+env \
+  -u GITHUB_TOKEN \
+  -u GH_ENTERPRISE_TOKEN \
+  -u GITHUB_ENTERPRISE_TOKEN \
+  -u GH_DEBUG \
+  -u DEBUG \
+  GH_TOKEN="$token" \
+  GH_HOST=github.com \
+  GH_REPO="$repository" \
+  GH_CONFIG_DIR="$config_dir" \
+  GH_PROMPT_DISABLED=1 \
+  "$real_gh" "$@"
+status=$?
+set -e
+
+trap - EXIT
+cleanup
+exit "$status"

@@ -18,16 +18,7 @@ Claude CodeとCodexを使う開発環境を共通化するためのDev Container
 }
 ```
 
-Dev Containerをビルドすると`.devcontainer-lock.json`が生成されます。このロックファイルもGitで管理することで、`agent-dev:1`が更新されても、明示的に更新するまでは同じバージョンとダイジェストを利用できます。
-
-更新を確認・適用する場合はDev Containers CLIを使います。
-
-```bash
-devcontainer outdated
-devcontainer upgrade
-```
-
-更新後はロックファイルの差分を確認し、Dev Containerを再ビルドして動作確認します。導入方法、バージョン管理、更新方法の詳細は[共通Dev Container Feature](docs/dev-container-feature.md)を参照してください。
+`.devcontainer-lock.json`もGitで管理することで、利用するFeatureのバージョンとdigestを固定できます。導入方法やバージョン管理の詳細は[共通Dev Container Feature](docs/dev-container-feature.md)を参照してください。
 
 ## GitHub操作をエージェントごとに分ける
 

@@ -26,17 +26,6 @@ Claude CodeやCodexからGitHubへ書き込む際、個人のGitHubアカウン�
 
 設定方法、必要な権限、認証情報の扱い、Rulesetとの組み合わせは[GitHub Agent identity](docs/github-agent-identity.md)を参照してください。
 
-## このリポジトリを開発する
-
-このリポジトリ自身のDev Containerは、公開済みの`agent-dev:1`を利用します。編集中の`src/agent-dev/`を自身の開発環境へ直接読み込む構成にはしていません。
-
-```bash
-make validate
-make test
-```
-
-Featureの実装は`src/agent-dev/`、実際のコンテナを使うテストは`test/agent-dev/`にあります。リリースは`main`からGitHub Actionsで手動実行します。
-
 ## ドキュメント
 
 - 導入方法、バージョン管理、更新、リリース: [docs/dev-container-feature.md](docs/dev-container-feature.md)

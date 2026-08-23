@@ -4,24 +4,38 @@
 
 ## 提供範囲
 
+### ツール
+
 | 提供物 | 現在の指定 | バージョン方針 | 備考 |
 |---|---|---|---|
-| Node.js | `22` | 22系を利用。exact versionは固定しない | `node:1` Featureから導入[^3] |
-| GitHub CLI | `latest` | build時のlatest | `github-cli:1` Featureから導入[^4] |
-| Claude Code CLI | `2.1.229` | exact固定 | `claudeCodeVersion`で上書き可能 |
-| Codex CLI | `0.147.0` | exact固定 | `codexVersion`で上書き可能 |
-| Claude Code VS Code拡張 | `anthropic.claude-code` | version未固定 | Marketplace版を利用[^5] |
-| ChatGPT VS Code拡張 | `openai.chatgpt` | version未固定 | Marketplace版を利用[^5] |
-| [agent-skills](https://github.com/vnzzzz/agent-skills) | 既定branch | version未固定 | post-create時に取得してClaude Code / Codexへ導入 |
-| `agent-github-auth` | `agent-dev`に同梱 | Feature versionに追従 | GitHub App認証用コマンド |
+| Node.js | `22` | 22系の最新版 | `node:1` Featureから導入[^3] |
+| GitHub CLI | `latest` | ビルド時点の最新版 | `github-cli:1` Featureから導入[^4] |
+| Claude Code CLI | `2.1.229` | 完全固定 | `claudeCodeVersion`で上書き可能 |
+| Codex CLI | `0.147.0` | 完全固定 | `codexVersion`で上書き可能 |
+| Claude Code VS Code拡張 | `anthropic.claude-code` | 未固定 | Marketplace版を利用[^5] |
+| ChatGPT VS Code拡張 | `openai.chatgpt` | 未固定 | Marketplace版を利用[^5] |
+| [agent-skills](https://github.com/vnzzzz/agent-skills) | 既定ブランチ | 未固定 | post-create時点の内容をClaude Code / Codexへ導入 |
+| 共通CLI | OS package repository | 未固定 | `git`、`curl`、`jq`、`make`、`openssl`、`shellcheck`、`unzip`、`zip`等 |
 
-Claude Code / Codex CLIの既定値は`src/agent-dev/devcontainer-feature.json`を正本とし、install時に指定versionと実際のversionが一致することを確認します。
+Claude Code / Codex CLIの既定値は`src/agent-dev/devcontainer-feature.json`を正本とし、install時に指定バージョンとの一致を確認します。
 
-`.devcontainer-lock.json`は`agent-dev`と依存Featureのversion / digestを固定します。一方、依存Featureがbuild時に解決するツール、post-createで取得する`agent-skills`、VS Code Marketplaceから入る拡張機能までは固定しません。[^6]
+### 認証関連
 
-GitHub Appの作成、権限、インストール先、秘密鍵はFeatureの管理対象外です。認証情報の扱いは[GitHub Appによるエージェント認証](github-agent-identity.md)と[SECURITY.md](../SECURITY.md)を参照してください。
+| 提供物 | 内容 |
+|---|---|
+| `agent-github-auth` | GitHub Appを使ってGitHub操作とcommitのAuthor / Committerをエージェント単位で分離 |
+| 認証用volume | Claude Code、Codex、GitHub CLIの認証状態をDev Containerの再作成後も保持 |
+| GitHub App設定領域 | App IDと秘密鍵をエージェントごとに分離。秘密鍵はcontainer writable layerに置き、rebuildでは保持しない |
 
-インストール対象はDebian / Ubuntu系のDev Containerです。
+GitHub Appの作成、権限、インストール先、秘密鍵はFeatureの管理対象外です。詳細は[GitHub Appによるエージェント認証](github-agent-identity.md)と[SECURITY.md](../SECURITY.md)を参照してください。
+
+### バージョン固定の範囲
+
+`.devcontainer-lock.json`は`agent-dev`と依存Featureのバージョン、digestを固定します。[^6]
+
+ただし、Featureのinstall時に外部から解決するツール、post-createで取得する`agent-skills`、VS Code Marketplaceから入る拡張機能までは固定しません。上表の「バージョン方針」を再現性の目安としてください。
+
+インストール対象はDebian / Ubuntu系のDev Containerです。Dev Container Feature自体の仕様は公式資料を参照してください。[^1][^2]
 
 ## 導入
 
@@ -38,7 +52,7 @@ GitHub Appの作成、権限、インストール先、秘密鍵はFeatureの管
 }
 ```
 
-`.devcontainer-lock.json`もGitで管理すると、利用するFeature artifactをversion / digestで固定できます。`agent-dev:1`は`2.x`へ自動移行しません。
+`.devcontainer-lock.json`もGitで管理すると、利用するFeature artifactをバージョン、digestで固定できます。`agent-dev:1`は`2.x`へ自動移行しません。
 
 ## 更新
 
@@ -80,9 +94,9 @@ make test
 
 ## 参考資料
 
-[^1]: [Dev Containers, Features](https://containers.dev/features)
+[^1]: [Dev Container Specification, Features](https://github.com/devcontainers/spec/blob/main/docs/specs/devcontainer-features.md)
 [^2]: [Dev Containers, Authoring a Dev Container Feature](https://containers.dev/guide/author-a-feature)
 [^3]: [Dev Containers Features, Node.js](https://github.com/devcontainers/features/tree/main/src/node)
 [^4]: [Dev Containers Features, GitHub CLI](https://github.com/devcontainers/features/tree/main/src/github-cli)
 [^5]: [Visual Studio Code, Supporting Remote Development](https://code.visualstudio.com/api/advanced-topics/remote-extensions)
-[^6]: [Visual Studio Code, Dev Container Feature lockfile](https://code.visualstudio.com/updates/v1_118#_dev-container-feature-lockfile)
+[^6]: [Dev Container Specification, Lockfiles](https://github.com/devcontainers/spec/blob/main/docs/specs/devcontainer-lockfile.md)

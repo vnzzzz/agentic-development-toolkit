@@ -4,16 +4,24 @@
 
 ## 提供範囲
 
-`agent-dev`は次を導入します。
+| 提供物 | 現在の指定 | バージョン方針 | 備考 |
+|---|---|---|---|
+| Node.js | `22` | 22系を利用。exact versionは固定しない | `node:1` Featureから導入[^3] |
+| GitHub CLI | `latest` | build時のlatest | `github-cli:1` Featureから導入[^4] |
+| Claude Code CLI | `2.1.229` | exact固定 | `claudeCodeVersion`で上書き可能 |
+| Codex CLI | `0.147.0` | exact固定 | `codexVersion`で上書き可能 |
+| Claude Code VS Code拡張 | `anthropic.claude-code` | version未固定 | Marketplace版を利用[^5] |
+| ChatGPT VS Code拡張 | `openai.chatgpt` | version未固定 | Marketplace版を利用[^5] |
+| [agent-skills](https://github.com/vnzzzz/agent-skills) | 既定branch | version未固定 | post-create時に取得してClaude Code / Codexへ導入 |
+| `agent-github-auth` | `agent-dev`に同梱 | Feature versionに追従 | GitHub App認証用コマンド |
 
-- Node.js 22、GitHub CLI
-- Claude Code / Codex CLIとVS Code拡張
-- `vnzzzz/agent-skills`
-- GitHub App認証用の`agent-github-auth`
+Claude Code / Codex CLIの既定値は`src/agent-dev/devcontainer-feature.json`を正本とし、install時に指定versionと実際のversionが一致することを確認します。
 
-各プロジェクトでは、アプリケーション固有のランタイム、依存関係、サービス、ポート、VS Code設定を管理します。GitHub Appの作成、権限、インストール先、秘密鍵もFeatureの管理対象外です。
+`.devcontainer-lock.json`は`agent-dev`と依存Featureのversion / digestを固定します。一方、依存Featureがbuild時に解決するツール、post-createで取得する`agent-skills`、VS Code Marketplaceから入る拡張機能までは固定しません。[^6]
 
-インストール対象はDebian / Ubuntu系のDev Containerです。Dev Container Featureの仕様と作成方法は公式資料を参照してください。[^1][^2]
+GitHub Appの作成、権限、インストール先、秘密鍵はFeatureの管理対象外です。認証情報の扱いは[GitHub Appによるエージェント認証](github-agent-identity.md)と[SECURITY.md](../SECURITY.md)を参照してください。
+
+インストール対象はDebian / Ubuntu系のDev Containerです。
 
 ## 導入
 
@@ -30,9 +38,7 @@
 }
 ```
 
-`.devcontainer-lock.json`もGitで管理すると、実際に利用するバージョンとdigestを固定できます。`agent-dev:1`は`2.x`へ自動移行しません。
-
-GitHub Appによるエージェントごとの認証は[GitHub Appによるエージェント認証](github-agent-identity.md)を参照してください。認証情報の保管条件とセキュリティ境界は[SECURITY.md](../SECURITY.md)を正本とします。
+`.devcontainer-lock.json`もGitで管理すると、利用するFeature artifactをversion / digestで固定できます。`agent-dev:1`は`2.x`へ自動移行しません。
 
 ## 更新
 
@@ -45,9 +51,9 @@ devcontainer upgrade
 
 更新後は`.devcontainer-lock.json`の差分を確認し、Dev Containerを再ビルドします。
 
-## バージョン
+## agent-devのバージョン
 
-FeatureとClaude Code / Codex CLIの既定バージョンは`src/agent-dev/devcontainer-feature.json`を正本とします。
+`agent-dev`はSemVerで管理します。
 
 - patch: 後方互換な修正、CLIのpatch更新
 - minor: 後方互換な機能追加
@@ -76,3 +82,7 @@ make test
 
 [^1]: [Dev Containers, Features](https://containers.dev/features)
 [^2]: [Dev Containers, Authoring a Dev Container Feature](https://containers.dev/guide/author-a-feature)
+[^3]: [Dev Containers Features, Node.js](https://github.com/devcontainers/features/tree/main/src/node)
+[^4]: [Dev Containers Features, GitHub CLI](https://github.com/devcontainers/features/tree/main/src/github-cli)
+[^5]: [Visual Studio Code, Supporting Remote Development](https://code.visualstudio.com/api/advanced-topics/remote-extensions)
+[^6]: [Visual Studio Code, Dev Container Feature lockfile](https://code.visualstudio.com/updates/v1_118#_dev-container-feature-lockfile)

@@ -6,13 +6,13 @@ GitHub API上の操作主体とGit commitのAuthor / Committerは別ですが、
 
 ## 構成
 
-| 操作主体 | GitHub上のidentity |
+| 操作主体 | GitHub上のアカウント |
 |---|---|
-| 個人の操作 | GitHub user |
+| 個人の操作 | GitHubユーザー |
 | Claude Code | Claude専用GitHub App |
 | Codex | Codex専用GitHub App |
 
-エージェントごとに専用GitHub Appを作成し、repository accessとpermissionsをGitHub側で制御します。Appの作成、権限設定、インストール方法はGitHub公式資料を参照してください。[^1][^2][^3]
+エージェントごとに専用GitHub Appを作成し、リポジトリアクセスと権限をGitHub側で制御します。Appの作成、権限設定、インストール方法はGitHub公式資料を参照してください。[^1][^2][^3]
 
 基本permissionsは次のとおりです。
 
@@ -25,25 +25,25 @@ Pull requests  read/write
 
 `Actions` / `Checks` / `Commit statuses` は必要な場合のみreadを追加します。`Administration` / `Workflows` / `Secrets` / `Environments` / `Actions write` は既定では付与しません。
 
-repository accessは`Only select repositories`を推奨します。認証情報と権限境界の詳細は[SECURITY.md](../SECURITY.md)を正本とします。
+リポジトリアクセスは`Only select repositories`を推奨します。認証情報と権限境界の詳細は[SECURITY.md](../SECURITY.md)を正本とします。
 
 ## 設定
 
-profileにはApp IDだけを保存します。
+認証profileにはApp IDだけを保存します。
 
 ```bash
 agent-github-auth configure claude <APP_ID>
 agent-github-auth configure codex <APP_ID>
 ```
 
-private keyは次へ配置します。
+秘密鍵は次へ配置します。
 
 ```text
 ~/.config/agent-dev/github-apps/claude/private-key.pem
 ~/.config/agent-dev/github-apps/codex/private-key.pem
 ```
 
-private keyはmode `0600`、current user ownershipが必要です。Dev Containerをrebuildすると消えるため、rebuild後は再配置します。
+秘密鍵はファイルモード`0600`かつ実行ユーザー所有である必要があります。Dev Containerをrebuildすると消えるため、rebuild後は再配置します。
 
 設定確認:
 
@@ -51,41 +51,41 @@ private keyはmode `0600`、current user ownershipが必要です。Dev Containe
 agent-github-auth status claude
 ```
 
-`status`はApp、current repositoryへのinstallation、repository限定Installation Tokenの発行とrevokeを確認します。token値は表示しません。GitHub App認証とInstallation Tokenの仕様は公式資料を参照してください。[^4][^5]
+`status`はApp、現在のリポジトリへのinstallation、リポジトリ限定Installation Tokenの発行と無効化を確認します。token値は表示しません。GitHub App認証とInstallation Tokenの仕様は公式資料を参照してください。[^4][^5]
 
 ## セッション
 
-interactive session:
+対話セッション:
 
 ```bash
 agent-github-auth claude
 ```
 
-特定commandだけを実行する場合:
+特定のコマンドだけを実行する場合:
 
 ```bash
 agent-github-auth claude -- claude
 agent-github-auth codex -- codex
 ```
 
-セッション開始時の`origin`を認証対象repositoryとして固定します。別repositoryを操作する場合は、そのrepositoryで新しいセッションを開始します。
+セッション開始時の`origin`を認証対象リポジトリとして固定します。別リポジトリを操作する場合は、そのリポジトリで新しいセッションを開始します。
 
 セッションでは次を強制します。
 
-- `gh` / 認証が必要なGit操作ごとに短命Installation Tokenを発行し、diskへ保存しない
+- `gh` / 認証が必要なGit操作ごとに短命Installation Tokenを発行し、ディスクへ保存しない
 - `gh` / Git / commit Author / Committerを同じApp botへ揃える
-- 個人の`gh auth`、ambient token、既存Git credentialへfallbackしない
+- 個人の`gh auth`、環境に残ったGitHub token、既存Git credentialを利用しない
 - `github.com`以外を対象とする`gh`操作を拒否する
-- 別のAuthorization header、credential helper、credential埋め込みURLが有効な場合はfail closedとする
-- GitHub SSHやinteractive credential promptへfallbackしない
+- 別のAuthorization header、credential helper、credential埋め込みURLが有効な場合は操作を拒否する
+- GitHub SSHや対話的なcredential入力へ切り替えない
 
-App tokenを利用するGit commandは`fetch` / `pull` / `push` / `ls-remote`に限定します。Git alias経由のnetwork operationはサポートしません。
+App tokenを利用するGit commandは`fetch` / `pull` / `push` / `ls-remote`に限定します。Git alias経由のネットワーク操作はサポートしません。
 
-private key compromise時を含むセキュリティ境界は[SECURITY.md](../SECURITY.md)を参照してください。
+秘密鍵が漏えいした場合を含むセキュリティ境界は[SECURITY.md](../SECURITY.md)を参照してください。
 
 ## Ruleset
 
-GitHub Appにはdefault branchのbypassを与えません。repository側では少なくとも次をRulesetで強制します。
+GitHub Appにはdefault branchのbypassを与えません。リポジトリ側では少なくとも次をRulesetで強制します。
 
 - Pull Request必須
 - required status checks

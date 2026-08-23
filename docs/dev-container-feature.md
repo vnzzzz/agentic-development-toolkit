@@ -1,12 +1,12 @@
 # 共通Dev Container Feature
 
-`agent-dev`は、Claude CodeとCodexを使う開発環境へ共通ツールと認証基盤を追加するDev Container Featureです。アプリケーション固有のランタイムや依存関係は各プロジェクトで管理します。
+`agent-dev`は、Claude CodeやCodexを使う開発環境を共通化するため、既存ツールと認証設定をまとめて導入するDev Container Featureです。アプリケーション固有のランタイムや依存関係は各プロジェクトで管理します。
 
 ## 提供範囲
 
 ### ツール
 
-| 提供物 | 現在の指定 | バージョン方針 | 備考 |
+| 導入対象 | 現在の指定 | バージョン方針 | 備考 |
 |---|---|---|---|
 | Node.js | `22` | 22系の最新版 | `node:1` Featureから導入[^3] |
 | GitHub CLI | `latest` | ビルド時点の最新版 | `github-cli:1` Featureから導入[^4] |
@@ -21,7 +21,7 @@ Claude Code / Codex CLIの既定値は`src/agent-dev/devcontainer-feature.json`�
 
 ### 認証関連
 
-| 提供物 | 内容 |
+| 機能 | 内容 |
 |---|---|
 | `agent-github-auth` | GitHub Appを使ってGitHub操作とcommitのAuthor / Committerをエージェント単位で分離 |
 | 認証用volume | Claude Code、Codex、GitHub CLIの認証状態をDev Containerの再作成後も保持 |

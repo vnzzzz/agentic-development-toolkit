@@ -14,7 +14,7 @@
 | Codex CLI | `0.147.0` | 完全固定 | `codexVersion`で上書き可能 |
 | Claude Code VS Code拡張 | `anthropic.claude-code` | 未固定 | Marketplace版を利用[^5] |
 | ChatGPT VS Code拡張 | `openai.chatgpt` | 未固定 | Marketplace版を利用[^5] |
-| [agent-skills](https://github.com/vnzzzz/agent-skills) | 既定ブランチ | 未固定 | post-create時点の内容をClaude Code / Codexへ導入 |
+| [vnzzzz/agent-skills](https://github.com/vnzzzz/agent-skills) | 既定ブランチ | 未固定 | post-create時点の内容をClaude Code / Codexへ導入 |
 | 基本ツール | OSパッケージリポジトリ | 未固定 | `git`、`curl`、`jq`、`make`、`openssl`、`shellcheck`、`unzip`、`zip`等 |
 
 Claude Code / Codex CLIの既定値は`src/agent-dev/devcontainer-feature.json`を正本とし、インストール時に指定バージョンとの一致を確認します。
@@ -24,14 +24,14 @@ Claude Code / Codex CLIの既定値は`src/agent-dev/devcontainer-feature.json`�
 | 機能 | 内容 |
 |---|---|
 | `agent-github-auth` | GitHub Appを使ってGitHub操作とcommitのAuthor / Committerをエージェント単位で分離 |
-| 認証用ボリューム | Claude Code、Codex、GitHub CLIの認証状態をDev Containerの再作成後も保持 |
-| GitHub App設定領域 | App IDと秘密鍵をエージェントごとに分離 |
+| 認証用ボリューム | Claude Code、Codex、GitHub CLIの認証領域を分離 |
+| GitHub App設定領域 | エージェントごとのGitHub App設定を分離 |
 
-GitHub Appの作成、権限、インストール先、秘密鍵はFeatureの管理対象外です。詳細は[GitHub Appによるエージェント認証](github-agent-identity.md)と[SECURITY.md](../SECURITY.md)を参照してください。
+認証情報の保存方式や寿命を含むセキュリティ境界は[SECURITY.md](../SECURITY.md)を正本とします。GitHub Appの設定方法は[GitHub Appによるエージェント認証](github-agent-identity.md)を参照してください。
 
 ### バージョン固定の範囲
 
-`.devcontainer-lock.json`は`agent-dev`と依存Featureのバージョン、digestを固定します。Featureのインストール時に外部から解決するツール、post-createで取得する`agent-skills`、VS Code Marketplaceの拡張機能は固定しません。[^6]
+`.devcontainer-lock.json`は`agent-dev`と依存Featureのバージョン、digestを固定します。Featureのインストール時に外部から解決するツール、post-createで取得する`vnzzzz/agent-skills`、VS Code Marketplaceの拡張機能は固定しません。[^6]
 
 `agent-dev:1`は`2.x`へ自動移行しません。
 

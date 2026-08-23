@@ -34,6 +34,17 @@
 
 GitHub Appによるエージェントごとの認証は[GitHub Appによるエージェント認証](github-agent-identity.md)を参照してください。認証情報の保管条件とセキュリティ境界は[SECURITY.md](../SECURITY.md)を正本とします。
 
+## 更新
+
+利用中のFeatureを更新する場合は、Dev Containers CLIで確認・更新します。
+
+```bash
+devcontainer outdated
+devcontainer upgrade
+```
+
+更新後は`.devcontainer-lock.json`の差分を確認し、Dev Containerを再ビルドします。
+
 ## バージョン
 
 FeatureとClaude Code / Codex CLIの既定バージョンは`src/agent-dev/devcontainer-feature.json`を正本とします。
@@ -43,6 +54,8 @@ FeatureとClaude Code / Codex CLIの既定バージョンは`src/agent-dev/devco
 - major: 利用側の変更が必要な破壊的変更
 
 公開済みの特定バージョンは上書きしません。
+
+<a id="release-workflow"></a>
 
 ## 開発とリリース
 

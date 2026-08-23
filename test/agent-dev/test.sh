@@ -128,7 +128,13 @@ auth_token_output=$(/usr/local/lib/agent-dev/auth-bin/gh auth token 2>&1 || true
 grep -q 'gh auth token is disabled in GitHub App session' <<<"$auth_token_output"
 unset AGENT_GITHUB_PROFILE AGENT_GITHUB_REPOSITORY
 
-# Authenticated Git must reject alternate Human credential sources before minting.
+# Authenticated Git tests reproduce the activation helper reset exactly.
+export GIT_CONFIG_COUNT=2
+export GIT_CONFIG_KEY_0=credential.helper
+export GIT_CONFIG_VALUE_0=''
+export GIT_CONFIG_KEY_1=credential.helper
+export GIT_CONFIG_VALUE_1='!agent-github-credential'
+
 header_repo=$(mktemp -d)
 git -C "$header_repo" init -q
 git -C "$header_repo" config --local \
@@ -142,25 +148,25 @@ grep -q 'refuses configured Git HTTP Authorization extraHeader' <<<"$header_outp
 git -C "$header_repo" config --unset-all \
   'http.https://github.com/vnzzzz/example-repo.git/info/refs.extraHeader'
 
+# Lower-precedence URL-specific helpers are also cleared by activation's empty helper.
 git -C "$header_repo" config --local \
   'credential.https://github.com/vnzzzz/example-repo.git.helper' \
   '!human-helper'
-helper_output=$(AGENT_GITHUB_PROFILE=claude \
+url_helper_output=$(AGENT_GITHUB_PROFILE=claude \
   AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo \
   /usr/local/lib/agent-dev/auth-bin/git -C "$header_repo" \
   ls-remote https://github.com/vnzzzz/example-repo.git 2>&1 || true)
-grep -q 'refuses configured Git credential helper' <<<"$helper_output"
+if grep -q 'refuses configured Git credential helper' <<<"$url_helper_output"; then
+  echo 'ERROR: reset URL-specific Git credential helper was treated as active.' >&2
+  exit 1
+fi
+grep -q 'GitHub App private key must be a regular file' <<<"$url_helper_output"
 git -C "$header_repo" config --unset-all \
   'credential.https://github.com/vnzzzz/example-repo.git.helper'
 
-# Lower-precedence helpers are safe once activation's empty helper resets the chain.
+# Generic system/global/local helpers must likewise be ignored after the reset.
 git -C "$header_repo" config --local credential.helper '!human-helper'
-reset_helper_output=$(GIT_CONFIG_COUNT=2 \
-  GIT_CONFIG_KEY_0=credential.helper \
-  GIT_CONFIG_VALUE_0='' \
-  GIT_CONFIG_KEY_1=credential.helper \
-  GIT_CONFIG_VALUE_1='!agent-github-credential' \
-  AGENT_GITHUB_PROFILE=claude \
+reset_helper_output=$(AGENT_GITHUB_PROFILE=claude \
   AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo \
   /usr/local/lib/agent-dev/auth-bin/git -C "$header_repo" \
   ls-remote https://github.com/vnzzzz/example-repo.git 2>&1 || true)
@@ -170,12 +176,8 @@ if grep -q 'refuses configured Git credential helper' <<<"$reset_helper_output";
 fi
 grep -q 'GitHub App private key must be a regular file' <<<"$reset_helper_output"
 
-late_helper_output=$(GIT_CONFIG_COUNT=2 \
-  GIT_CONFIG_KEY_0=credential.helper \
-  GIT_CONFIG_VALUE_0='' \
-  GIT_CONFIG_KEY_1=credential.helper \
-  GIT_CONFIG_VALUE_1='!agent-github-credential' \
-  AGENT_GITHUB_PROFILE=claude \
+# A helper added after activation's reset remains active and must be rejected.
+late_helper_output=$(AGENT_GITHUB_PROFILE=claude \
   AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo \
   /usr/local/lib/agent-dev/auth-bin/git -C "$header_repo" \
   -c 'credential.helper=!human-helper' \
@@ -212,6 +214,8 @@ alias_output=$(AGENT_GITHUB_PROFILE=claude \
 grep -q "Git alias 'publish' is not supported in GitHub App session" <<<"$alias_output"
 git -C "$header_repo" config --unset alias.publish
 rm -rf "$header_repo"
+
+unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1
 
 export AGENT_GITHUB_PROFILE=claude
 export AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo

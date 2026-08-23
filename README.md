@@ -2,7 +2,7 @@
 
 Claude CodeとCodexを使う開発環境を共通化するためのDev Container Feature `agent-dev`を提供するリポジトリです。
 
-`agent-dev`を導入すると、Claude Code / Codex CLI、GitHub CLI、共通スキル、GitHub App認証用のコマンドなどをDev Containerへまとめて導入できます。アプリケーション固有のランタイムや依存関係、サービス設定は各プロジェクト側で管理します。
+`agent-dev`を導入すると、Claude Code / Codex CLI、GitHub CLI、[agent-skills](https://github.com/vnzzzz/agent-skills)、GitHub App認証用のコマンドなどをDev Containerへまとめて導入できます。アプリケーション固有のランタイムや依存関係、サービス設定は各プロジェクト側で管理します。
 
 ## プロジェクトで利用する
 
@@ -18,7 +18,7 @@ Claude CodeとCodexを使う開発環境を共通化するためのDev Container
 }
 ```
 
-`.devcontainer-lock.json`もGitで管理することで、利用するFeatureのバージョンとdigestを固定できます。導入方法やバージョン管理の詳細は[共通Dev Container Feature](docs/dev-container-feature.md)を参照してください。
+`.devcontainer-lock.json`もGitで管理することで、利用するFeatureのversion / digestを固定できます。提供されるツールとバージョン方針は[共通Dev Container Feature](docs/dev-container-feature.md)を参照してください。
 
 ## GitHub操作をエージェントごとに分ける
 
@@ -28,7 +28,7 @@ Claude CodeやCodexからGitHubへ書き込む際、個人のGitHubアカウン�
 
 ## ドキュメント
 
-- 導入方法、バージョン管理、更新、リリース: [docs/dev-container-feature.md](docs/dev-container-feature.md)
+- 提供範囲、バージョン方針、導入、更新、リリース: [docs/dev-container-feature.md](docs/dev-container-feature.md)
 - GitHub Appによるエージェントごとの操作主体の分離: [docs/github-agent-identity.md](docs/github-agent-identity.md)
 - 認証情報とセキュリティ境界: [SECURITY.md](SECURITY.md)
 - このリポジトリの変更ルール: [AGENTS.md](AGENTS.md)

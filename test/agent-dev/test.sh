@@ -153,6 +153,36 @@ grep -q 'refuses configured Git credential helper' <<<"$helper_output"
 git -C "$header_repo" config --unset-all \
   'credential.https://github.com/vnzzzz/example-repo.git.helper'
 
+# Lower-precedence helpers are safe once activation's empty helper resets the chain.
+git -C "$header_repo" config --local credential.helper '!human-helper'
+reset_helper_output=$(GIT_CONFIG_COUNT=2 \
+  GIT_CONFIG_KEY_0=credential.helper \
+  GIT_CONFIG_VALUE_0='' \
+  GIT_CONFIG_KEY_1=credential.helper \
+  GIT_CONFIG_VALUE_1='!agent-github-credential' \
+  AGENT_GITHUB_PROFILE=claude \
+  AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo \
+  /usr/local/lib/agent-dev/auth-bin/git -C "$header_repo" \
+  ls-remote https://github.com/vnzzzz/example-repo.git 2>&1 || true)
+if grep -q 'refuses configured Git credential helper' <<<"$reset_helper_output"; then
+  echo 'ERROR: reset lower-precedence Git credential helper was treated as active.' >&2
+  exit 1
+fi
+grep -q 'GitHub App private key must be a regular file' <<<"$reset_helper_output"
+
+late_helper_output=$(GIT_CONFIG_COUNT=2 \
+  GIT_CONFIG_KEY_0=credential.helper \
+  GIT_CONFIG_VALUE_0='' \
+  GIT_CONFIG_KEY_1=credential.helper \
+  GIT_CONFIG_VALUE_1='!agent-github-credential' \
+  AGENT_GITHUB_PROFILE=claude \
+  AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo \
+  /usr/local/lib/agent-dev/auth-bin/git -C "$header_repo" \
+  -c 'credential.helper=!human-helper' \
+  ls-remote https://github.com/vnzzzz/example-repo.git 2>&1 || true)
+grep -q 'refuses configured Git credential helper' <<<"$late_helper_output"
+git -C "$header_repo" config --unset-all credential.helper
+
 cli_header_output=$(AGENT_GITHUB_PROFILE=claude \
   AGENT_GITHUB_REPOSITORY=vnzzzz/example-repo \
   /usr/local/lib/agent-dev/auth-bin/git -C "$header_repo" \

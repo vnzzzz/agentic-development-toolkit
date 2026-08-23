@@ -24,7 +24,7 @@ Claude CodeとCodexを使う開発環境を共通化するためのDev Container
 
 Claude CodeやCodexからGitHubへ書き込む際、個人のGitHubアカウントとは別に、エージェント専用のGitHub Appを使うことができます。`agent-github-auth`を利用すると、GitHub上の操作主体とGit commitのAuthor / CommitterをGitHub App botへ揃えられます。
 
-設定方法、必要な権限、認証情報の扱い、Rulesetとの組み合わせは[GitHub Agent identity](docs/github-agent-identity.md)を参照してください。
+設定方法、必要な権限、認証情報の扱い、Rulesetとの組み合わせは[GitHub Appによるエージェント認証](docs/github-agent-identity.md)を参照してください。
 
 ## ドキュメント
 

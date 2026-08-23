@@ -1,23 +1,20 @@
-# GitHub Agent identity
+# GitHub Appによるエージェント認証
 
-`agent-dev`は、Claude Code / CodexのGitHub writeをHuman credentialから分離し、AgentごとのGitHub App bot identityで実行します。
+`agent-github-auth`は、Claude Code / CodexのGitHub操作を個人アカウントから分離し、エージェント専用のGitHub App botとして実行するためのコマンドです。
 
-## Identity model
+GitHub API上の操作主体とGit commitのAuthor / Committerは別ですが、このコマンドは両方を同じApp botへ揃えます。
 
-| Principal | GitHub identity |
+## 構成
+
+| 操作主体 | GitHub上のアカウント |
 |---|---|
-| Human | GitHub user |
-| Claude | dedicated GitHub App |
-| Codex | dedicated GitHub App |
-| ChatGPT | ChatGPT Codex Connector。現状はHuman-supervised exception |
+| 個人の操作 | GitHubユーザー |
+| Claude Code | Claude専用GitHub App |
+| Codex | Codex専用GitHub App |
 
-GitHub API上のactorとGit commitのAuthor / Committerは別ですが、`agent-github-auth`は両方を同じApp botへ揃えます。
+エージェントごとに専用GitHub Appを作成し、リポジトリアクセスと権限をGitHub側で制御します。Appの作成、権限設定、インストール方法はGitHub公式資料を参照してください。[^1][^2][^3]
 
-## GitHub Appの前提
-
-Agentごとに専用GitHub Appを作成し、repository accessとpermissionsを利用者側で制御します。
-
-基本permissions:
+基本permissionsは次のとおりです。
 
 ```text
 Metadata       read
@@ -26,92 +23,84 @@ Issues         read/write
 Pull requests  read/write
 ```
 
-必要な場合のみ `Actions` / `Checks` / `Commit statuses` のreadを追加します。`Administration` / `Workflows` / `Secrets` / `Environments` / `Actions write` は既定で付与しません。
+`Actions` / `Checks` / `Commit statuses` は必要な場合のみreadを追加します。`Administration` / `Workflows` / `Secrets` / `Environments` / `Actions write` は既定では付与しません。
 
-repository accessは`Only select repositories`を推奨します。詳細なtrust boundaryは[SECURITY.md](../SECURITY.md)を正本とします。
+リポジトリアクセスは`Only select repositories`を推奨します。認証情報と権限境界の詳細は[SECURITY.md](../SECURITY.md)を正本とします。
 
-GitHub Appの作成・permission・installationはGitHub公式資料を参照してください。
+## 設定
 
-- [Registering a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app)
-- [Choosing permissions for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)
-- [Installing your own GitHub App](https://docs.github.com/en/apps/using-github-apps/installing-your-own-github-app)
-
-## Setup
-
-profileにはApp IDだけを保存します。App slugとbot identityは認証済みApp metadataから取得します。
+認証profileにはApp IDだけを保存します。
 
 ```bash
 agent-github-auth configure claude <APP_ID>
 agent-github-auth configure codex <APP_ID>
 ```
 
-build / rebuild後にprivate keyを配置します。
+秘密鍵は次へ配置します。
 
 ```text
 ~/.config/agent-dev/github-apps/claude/private-key.pem
 ~/.config/agent-dev/github-apps/codex/private-key.pem
 ```
 
-private keyはmode `0600`、current user ownershipが必要です。保管条件とlifecycleは[SECURITY.md](../SECURITY.md)を参照してください。
+秘密鍵はファイルモード`0600`かつ実行ユーザー所有である必要があります。Dev Containerをrebuildすると消えるため、rebuild後は再配置します。
 
-確認:
+設定確認:
 
 ```bash
 agent-github-auth status claude
 ```
 
-`status`はApp identity、current repositoryへのinstallation、repo-scoped Installation Tokenのmint / revokeを確認します。token値は表示しません。
+`status`はApp、現在のリポジトリへのinstallation、リポジトリ限定Installation Tokenの発行と無効化を確認します。token値は表示しません。GitHub App認証とInstallation Tokenの仕様は公式資料を参照してください。[^4][^5]
 
-## Agent session
+## セッション
 
-interactive session:
+対話セッション:
 
 ```bash
 agent-github-auth claude
 ```
 
-特定commandだけを実行:
+特定のコマンドだけを実行する場合:
 
 ```bash
 agent-github-auth claude -- claude
 agent-github-auth codex -- codex
 ```
 
-session開始時の`origin`を認証対象repositoryとして固定します。session中に`cd`してもtoken scopeは変わりません。別repositoryを操作する場合は、そのrepositoryで新しいsessionを開始します。
+セッション開始時の`origin`を認証対象リポジトリとして固定します。別リポジトリを操作する場合は、そのリポジトリで新しいセッションを開始します。
 
-sessionでは次を保証します。
+セッションでは次を強制します。
 
-- `gh` / authenticated Git operationごとに短命Installation Tokenを発行し、diskへ保存しない
-- `gh` / `git push` / Git Author / Committerを同じApp bot identityへ揃える
-- Human `gh auth`、ambient GitHub token、既存Git credentialへfallbackしない
-- `github.com`以外の`gh` targetを拒否する
-- authenticated Git operationで別のAuthorization header / credential helperやcredential埋め込みURLが有効ならfail closedする
-- GitHub SSH / interactive credential promptへfallbackしない
+- `gh` / 認証が必要なGit操作ごとに短命Installation Tokenを発行し、ディスクへ保存しない
+- `gh` / Git / commit Author / Committerを同じApp botへ揃える
+- 個人の`gh auth`、環境に残ったGitHub token、既存Git credentialを利用しない
+- `github.com`以外を対象とする`gh`操作を拒否する
+- 別のAuthorization header、credential helper、credential埋め込みURLが有効な場合は操作を拒否する
+- GitHub SSHや対話的なcredential入力へ切り替えない
 
-App tokenを利用するGit commandはcanonicalな`fetch` / `pull` / `push` / `ls-remote`に限定します。Git aliasからnetwork operationを実行する形はサポートせず、canonical commandを使用します。
+App tokenを利用するGit commandは`fetch` / `pull` / `push` / `ls-remote`に限定します。Git alias経由のネットワーク操作はサポートしません。
 
-実装上のcredential guardやprivate key compromise時の境界は[SECURITY.md](../SECURITY.md)を正本とします。
+秘密鍵が漏えいした場合を含むセキュリティ境界は[SECURITY.md](../SECURITY.md)を参照してください。
 
-GitHub App認証の仕様:
+## Ruleset
 
-- [Authenticating as a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app)
-- [Generating an installation access token for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)
-
-## Repository rules
-
-Agent Appへdefault branchのbypassを与えません。repository側ではRulesetで少なくとも次を強制します。
+GitHub Appにはdefault branchのbypassを与えません。リポジトリ側では少なくとも次をRulesetで強制します。
 
 - Pull Request必須
 - required status checks
 - force push禁止
 - branch deletion禁止
-- Agent Appによるdefault branch直接更新禁止
+- GitHub Appによるdefault branch直接更新禁止
 
-RulesetはFeatureから自動作成しません。
+Rulesetは`agent-dev`から自動作成しません。設定方法はGitHub公式資料を参照してください。[^6][^7]
 
-- [About rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)
-- [Creating rulesets for a repository](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository)
+## 参考資料
 
-## Security
-
-credential persistence、Human credential、private key、installation scope、Docker daemonを含むtrust boundaryは[SECURITY.md](../SECURITY.md)を唯一の正本とします。
+[^1]: [GitHub Docs, Registering a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app)
+[^2]: [GitHub Docs, Choosing permissions for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app)
+[^3]: [GitHub Docs, Installing your own GitHub App](https://docs.github.com/en/apps/using-github-apps/installing-your-own-github-app)
+[^4]: [GitHub Docs, Authenticating as a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/authenticating-as-a-github-app)
+[^5]: [GitHub Docs, Generating an installation access token for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)
+[^6]: [GitHub Docs, About rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets)
+[^7]: [GitHub Docs, Creating rulesets for a repository](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository)

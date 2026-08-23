@@ -1,29 +1,23 @@
 # 共通Dev Container Feature
 
-`agent-dev`は、Claude CodeとCodexを利用するprojectへ共通toolと認証基盤を追加するDev Container Featureです。consumer repositoryは自身をVS Code workspace / Git rootとして直接開き、project固有runtimeはconsumer側で管理します。
+`agent-dev`は、Claude CodeとCodexを使う開発環境へ共通ツールと認証基盤を追加するDev Container Featureです。アプリケーション固有のランタイムや依存関係は各プロジェクトで管理します。
 
-## Scope
+## 提供範囲
 
-Featureが提供するもの:
+`agent-dev`は次を導入します。
 
-- Node.js 22、GitHub CLI、共通CLI
-- version固定のClaude Code / Codex CLI
-- Claude Code / Codex / Human用GitHub CLIの認証volume
-- GitHub App bot identity用`agent-github-auth`
-- Claude Code / CodexのVS Code extension
-- public `vnzzzz/agent-skills` Plugin bootstrap
+- Node.js 22、GitHub CLI
+- Claude Code / Codex CLIとVS Code拡張
+- `vnzzzz/agent-skills`
+- GitHub App認証用の`agent-github-auth`
 
-consumer側で管理するもの:
+各プロジェクトでは、アプリケーション固有のランタイム、依存関係、サービス、ポート、VS Code設定を管理します。GitHub Appの作成、権限、インストール先、秘密鍵もFeatureの管理対象外です。
 
-- Python、Go等のproject runtime
-- project固有dependency、service、port、VS Code設定
-- GitHub Appの作成、permissions、installation scope、private key
+インストール対象はDebian / Ubuntu系のDev Containerです。Dev Container Featureの仕様と作成方法は公式資料を参照してください。[^1][^2]
 
-install scriptはDebian / Ubuntu系Dev Container imageを対象とします。
+## 導入
 
-## Consumer workflow
-
-`.devcontainer/devcontainer.json`からmajor versionを参照します。
+`.devcontainer/devcontainer.json`からメジャーバージョンを参照します。
 
 ```json
 {
@@ -36,90 +30,49 @@ install scriptはDebian / Ubuntu系Dev Container imageを対象とします。
 }
 ```
 
-build後に生成される`.devcontainer-lock.json`をcommitしてください。major tagが更新されても、lockfileを更新するまで既存projectは同じexact versionとdigestを利用します。
+`.devcontainer-lock.json`もGitで管理すると、実際に利用するバージョンとdigestを固定できます。`agent-dev:1`は`2.x`へ自動移行しません。
 
-Claude Code / Codexは必要に応じてloginします。Humanの`gh auth login`とAgent App sessionは分離してください。
+GitHub Appによるエージェントごとの認証は[GitHub Appによるエージェント認証](github-agent-identity.md)を参照してください。認証情報の保管条件とセキュリティ境界は[SECURITY.md](../SECURITY.md)を正本とします。
 
-### GitHub Agent identity
+## 更新
 
-profile設定:
-
-```bash
-agent-github-auth configure claude <APP_ID>
-agent-github-auth configure codex <APP_ID>
-```
-
-private key配置:
-
-```text
-~/.config/agent-dev/github-apps/claude/private-key.pem
-~/.config/agent-dev/github-apps/codex/private-key.pem
-```
-
-確認・起動:
-
-```bash
-agent-github-auth status claude
-agent-github-auth claude
-agent-github-auth codex -- codex
-```
-
-permissions、credential lifecycle、repository scope、Rulesetは[GitHub Agent identity](github-agent-identity.md)を参照してください。trust boundaryは[SECURITY.md](../SECURITY.md)を正本とします。
-
-## Versioning
-
-Feature versionとAgent CLIの既定versionは`src/agent-dev/devcontainer-feature.json`を正本とします。
-
-- patch: 後方互換なbug fix / CLI patch更新
-- minor: 後方互換な機能追加
-- major: consumer側の変更が必要なbreaking change
-
-published exact versionはimmutableです。同じversionを異なる内容で再publishしません。
-
-## Consumer update
+利用中のFeatureを更新する場合は、Dev Containers CLIで確認・更新します。
 
 ```bash
 devcontainer outdated
 devcontainer upgrade
 ```
 
-更新後はlockfile差分とDev Container buildを通常のcode changeとしてreviewします。`agent-dev:1`を参照するconsumerは`2.x`へ自動移行しません。
+更新後は`.devcontainer-lock.json`の差分を確認し、Dev Containerを再ビルドします。
 
-## Release workflow
+## バージョン
 
-Feature sourceは`src/agent-dev/`です。release対象変更ではSemVerを更新し、PRで`feature-ci` / `security`が成功してからmergeします。
+FeatureとClaude Code / Codex CLIの既定バージョンは`src/agent-dev/devcontainer-feature.json`を正本とします。
 
-releaseは`main`から`.github/workflows/release-feature.yml`を手動実行します。workflowは次をfail closedで確認します。
+- patch: 後方互換な修正、CLIのpatch更新
+- minor: 後方互換な機能追加
+- major: 利用側の変更が必要な破壊的変更
 
-- exact versionが未publishである
-- version照会結果を判定できる
-- publishにはworkflow固有`GITHUB_TOKEN`と`packages: write`だけを使用する
+公開済みの特定バージョンは上書きしません。
 
-publish先:
+<a id="release-workflow"></a>
 
-```text
-ghcr.io/vnzzzz/agentic-development-toolkit/agent-dev
-```
+## 開発とリリース
 
-認証なしで利用する場合は、Feature collection metadata packageと`agent-dev` packageの両方をPublicにします。
-
-## Authoring workflow
-
-repository自身の`.devcontainer/`は公開済み`agent-dev:1`を利用し、編集中の`src/agent-dev/`を自己参照しません。
+Featureの実装は`src/agent-dev/`、実コンテナを使うテストは`test/agent-dev/`にあります。
 
 ```bash
 make validate
 make test
 ```
 
-- `make validate`: metadata、shell syntax / ShellCheck、release version guard
-- `make test`: `devcontainer features test`による実container検証
+リリース対象の変更ではFeatureのバージョンを更新し、PRで`feature-ci`と`security`が成功してからマージします。公開は`main`から`.github/workflows/release-feature.yml`を手動実行します。
 
-未publish versionは別containerで検証します。release後にself-hosting環境へ採用する場合は、別changeで`devcontainer upgrade`して`.devcontainer-lock.json`をreviewします。
+リリースworkflowは、同じバージョンが未公開であることを確認できない場合は停止します。公開にはworkflow固有の`GITHUB_TOKEN`を使用します。
 
-## Supporting documents
+このリポジトリ自身のDev Containerは公開済み`agent-dev:1`を利用します。未公開バージョンを`.devcontainer-lock.json`へ先行反映しません。
 
-- repository入口: [README.md](../README.md)
-- GitHub Agent identity: [github-agent-identity.md](github-agent-identity.md)
-- trust boundary: [SECURITY.md](../SECURITY.md)
-- repository変更規則: [AGENTS.md](../AGENTS.md)
+## 参考資料
+
+[^1]: [Dev Containers, Features](https://containers.dev/features)
+[^2]: [Dev Containers, Authoring a Dev Container Feature](https://containers.dev/guide/author-a-feature)

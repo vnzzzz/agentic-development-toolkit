@@ -34,21 +34,20 @@ jobs:
           changed="$(git diff --name-only "$BASE_SHA"...HEAD)"
           failed=0
 
-          for source in README.md SECURITY.md docs/*.md; do
-            [[ "$source" == *.ja.md ]] && continue
-
-            mirror="${source%.md}.ja.md"
-            if [[ ! -f "$mirror" ]]; then
-              echo "::error::$source has no Japanese mirror at $mirror"
-              failed=1
-              continue
-            fi
-
-            if grep -Fxq "$source" <<<"$changed" && ! grep -Fxq "$mirror" <<<"$changed"; then
-              echo "::error::$source changed without updating $mirror"
-              failed=1
-            fi
-          done
+          while IFS= read -r source; do
+            case "$source" in
+              *.ja.md)
+                continue
+                ;;
+              README.md|SECURITY.md|docs/*.md)
+                mirror="${source%.md}.ja.md"
+                if ! grep -Fxq "$mirror" <<<"$changed"; then
+                  echo "::error::$source changed without updating $mirror"
+                  failed=1
+                fi
+                ;;
+            esac
+          done <<<"$changed"
 
           exit "$failed"
       - name: Install validation tools

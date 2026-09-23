@@ -27,7 +27,7 @@ Pull requests  read/write
 
 `Actions` / `Checks` / `Commit statuses` は必要な場合のみreadを追加します。`Administration` / `Workflows` / `Secrets` / `Environments` / `Actions write` は既定では付与しません。
 
-リポジトリアクセスは`Only select repositories`を推奨します。認証情報と権限境界の詳細は[SECURITY.ja.md](../SECURITY.ja.md)を正本とします。
+リポジトリアクセスは`Only select repositories`を推奨します。認証情報と権限境界の詳細は[SECURITY.ja.md](../SECURITY.ja.md)を参照してください。
 
 ## 設定
 

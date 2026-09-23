@@ -60,7 +60,7 @@ private keyはDev Container rebuildで消えることを仕様とします。cre
 - release workflowは`contents: read`と`packages: write`だけを使用し、個人PATを使わない。
 - published exact Feature versionはimmutableとして扱う。
 
-release behaviorは[共通Dev Container Feature](docs/dev-container-feature.ja.md#release-workflow)を正本とします。
+release behaviorは[共通Dev Container Feature](docs/dev-container-feature.ja.md#release-workflow)を参照してください。
 
 ## Authoring boundary
 

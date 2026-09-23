@@ -29,7 +29,7 @@ Claude Code / Codex CLIの既定値は`src/agent-dev/devcontainer-feature.json`�
 | 認証用ボリューム | Claude Code、Codex、GitHub CLIの認証領域を分離 |
 | GitHub App設定領域 | エージェントごとのGitHub App設定を分離 |
 
-認証情報の保存方式や寿命を含むセキュリティ境界は[SECURITY.ja.md](../SECURITY.ja.md)を正本とします。GitHub Appの設定方法は[GitHub Appによるエージェント認証](github-agent-identity.ja.md)を参照してください。
+認証情報の保存方式や寿命を含むセキュリティ境界は[SECURITY.ja.md](../SECURITY.ja.md)を参照してください。GitHub Appの設定方法は[GitHub Appによるエージェント認証](github-agent-identity.ja.md)を参照してください。
 
 ### バージョン固定の範囲
 

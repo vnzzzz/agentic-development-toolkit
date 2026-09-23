@@ -35,6 +35,8 @@
 - READMEはrepositoryの目的、基本workflow、入口だけを記載する。
 - Featureのconsumer contract、version、releaseは`docs/dev-container-feature.md`を正本とする。
 - trust boundaryとcredentialの扱いは`SECURITY.md`を正本とする。
+- repository利用者向けdocumentationは英語をcanonicalとし、対応する`*.ja.md`を日本語translation mirrorとする。
+- canonical文書を変更するPRでは、対応する日本語mirrorも同じPRで更新する。日本語側だけの表現修正はcanonical変更を要求しない。
 - 同じ仕様を複数documentへ複製しない。
 
 ## Supporting documents

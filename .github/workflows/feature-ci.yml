@@ -22,6 +22,28 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Check documentation translation sync
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -Eeuo pipefail
+          changed="$(git diff --name-only "$BASE_SHA"...HEAD)"
+          require_mirror() {
+            local source="$1"
+            local mirror="$2"
+            if grep -Fxq "$source" <<<"$changed" && ! grep -Fxq "$mirror" <<<"$changed"; then
+              echo "::error::$source changed without updating $mirror"
+              return 1
+            fi
+          }
+          require_mirror README.md README.ja.md
+          require_mirror SECURITY.md SECURITY.ja.md
+          require_mirror docs/dev-container-feature.md docs/dev-container-feature.ja.md
+          require_mirror docs/github-agent-identity.md docs/github-agent-identity.ja.md
       - name: Install validation tools
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
       - name: Validate Feature source

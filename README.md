@@ -1,12 +1,14 @@
 # Agentic Development Toolkit
 
-Claude CodeとCodexを使う開発環境を共通化するDev Container Feature `agent-dev`を管理するリポジトリです。
+[日本語](README.ja.md)
 
-`agent-dev`は、Claude Code / Codex CLI、GitHub CLI、[vnzzzz/agent-skills](https://github.com/vnzzzz/agent-skills)、GitHub App認証用コマンドなどを共通構成でDev Containerへ導入・設定します。プロジェクト固有のランタイムや依存関係、サービス設定は各プロジェクトで管理します。
+This repository maintains the `agent-dev` Dev Container Feature, which standardizes development environments that use Claude Code and Codex.
 
-## プロジェクトで利用する
+`agent-dev` installs and configures Claude Code / Codex CLI, GitHub CLI, [vnzzzz/agent-skills](https://github.com/vnzzzz/agent-skills), GitHub App authentication commands, and related tooling in a shared Dev Container setup. Project-specific runtimes, dependencies, and service configuration remain in each consumer project.
 
-`.devcontainer/devcontainer.json`の`features`に`agent-dev`を追加します。
+## Use in a project
+
+Add `agent-dev` to `features` in `.devcontainer/devcontainer.json`.
 
 ```json
 {
@@ -18,17 +20,17 @@ Claude CodeとCodexを使う開発環境を共通化するDev Container Feature 
 }
 ```
 
-Featureのバージョンとdigestを固定する場合は`.devcontainer-lock.json`もGitで管理します。導入対象とバージョン方針は[共通Dev Container Feature](docs/dev-container-feature.md)を参照してください。
+To pin the Feature version and digest, also commit `.devcontainer-lock.json`. See [Shared Dev Container Feature](docs/dev-container-feature.md) for the installed components and versioning policy.
 
-## GitHub操作をエージェントごとに分ける
+## Separate GitHub identities by agent
 
-Claude CodeやCodexのGitHub書き込みには、個人アカウントとは別のGitHub Appを利用できます。`agent-github-auth`はGitHub上の操作主体とGit commitのAuthor / CommitterをApp botへ揃えます。
+GitHub writes from Claude Code or Codex can use dedicated GitHub Apps instead of a personal account. `agent-github-auth` aligns the GitHub actor and the Git commit Author / Committer with the same App bot.
 
-設定方法、権限、認証情報、Rulesetは[GitHub Appによるエージェント認証](docs/github-agent-identity.md)を参照してください。
+See [GitHub App authentication for agents](docs/github-agent-identity.md) for configuration, permissions, credentials, and Ruleset guidance.
 
-## ドキュメント
+## Documentation
 
-- 導入内容、バージョン方針、更新、リリース: [docs/dev-container-feature.md](docs/dev-container-feature.md)
-- GitHub Appによるエージェントごとの操作主体の分離: [docs/github-agent-identity.md](docs/github-agent-identity.md)
-- 認証情報とセキュリティ境界: [SECURITY.md](SECURITY.md)
-- このリポジトリの変更ルール: [AGENTS.md](AGENTS.md)
+- Installed components, versioning policy, updates, and releases: [docs/dev-container-feature.md](docs/dev-container-feature.md)
+- Separate GitHub identities for agents with GitHub Apps: [docs/github-agent-identity.md](docs/github-agent-identity.md)
+- Credentials and security boundaries: [SECURITY.md](SECURITY.md)
+- Rules for changing this repository: [AGENTS.md](AGENTS.md)

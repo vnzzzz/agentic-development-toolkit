@@ -1,0 +1,36 @@
+# Agentic Development Toolkit
+
+[English](README.md)
+
+Claude CodeとCodexを使う開発環境を共通化するDev Container Feature `agent-dev`を管理するリポジトリです。
+
+`agent-dev`は、Claude Code / Codex CLI、GitHub CLI、[vnzzzz/agent-skills](https://github.com/vnzzzz/agent-skills)、GitHub App認証用コマンドなどを共通構成でDev Containerへ導入・設定します。プロジェクト固有のランタイムや依存関係、サービス設定は各プロジェクトで管理します。
+
+## プロジェクトで利用する
+
+`.devcontainer/devcontainer.json`の`features`に`agent-dev`を追加します。
+
+```json
+{
+  "image": "mcr.microsoft.com/devcontainers/base:bookworm",
+  "features": {
+    "ghcr.io/vnzzzz/agentic-development-toolkit/agent-dev:1": {}
+  },
+  "remoteUser": "vscode"
+}
+```
+
+Featureのバージョンとdigestを固定する場合は`.devcontainer-lock.json`もGitで管理します。導入対象とバージョン方針は[共通Dev Container Feature](docs/dev-container-feature.ja.md)を参照してください。
+
+## GitHub操作をエージェントごとに分ける
+
+Claude CodeやCodexのGitHub書き込みには、個人アカウントとは別のGitHub Appを利用できます。`agent-github-auth`はGitHub上の操作主体とGit commitのAuthor / CommitterをApp botへ揃えます。
+
+設定方法、権限、認証情報、Rulesetは[GitHub Appによるエージェント認証](docs/github-agent-identity.ja.md)を参照してください。
+
+## ドキュメント
+
+- 導入内容、バージョン方針、更新、リリース: [docs/dev-container-feature.ja.md](docs/dev-container-feature.ja.md)
+- GitHub Appによるエージェントごとの操作主体の分離: [docs/github-agent-identity.ja.md](docs/github-agent-identity.ja.md)
+- 認証情報とセキュリティ境界: [SECURITY.ja.md](SECURITY.ja.md)
+- このリポジトリの変更ルール: [AGENTS.md](AGENTS.md)

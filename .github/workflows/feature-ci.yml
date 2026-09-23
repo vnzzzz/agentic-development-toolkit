@@ -22,6 +22,50 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Check documentation translation sync
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -Eeuo pipefail
+          changed="$(git diff --name-only "$BASE_SHA"...HEAD)"
+          failed=0
+          declare -A affected=()
+
+          while IFS= read -r path; do
+            case "$path" in
+              README.md|SECURITY.md|docs/*.md)
+                if [[ "$path" == *.ja.md ]]; then
+                  affected["${path%.ja.md}.md"]=1
+                else
+                  affected["$path"]=1
+                fi
+                ;;
+            esac
+          done <<<"$changed"
+
+          for source in "${!affected[@]}"; do
+            mirror="${source%.md}.ja.md"
+
+            if grep -Fxq "$source" <<<"$changed" && ! grep -Fxq "$mirror" <<<"$changed"; then
+              echo "::error::$source changed without updating $mirror"
+              failed=1
+            fi
+
+            source_exists=0
+            mirror_exists=0
+            [[ -e "$source" ]] && source_exists=1
+            [[ -e "$mirror" ]] && mirror_exists=1
+            if (( source_exists != mirror_exists )); then
+              echo "::error::$source and $mirror must either both exist or both be absent"
+              failed=1
+            fi
+          done
+
+          exit "$failed"
       - name: Install validation tools
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
       - name: Validate Feature source

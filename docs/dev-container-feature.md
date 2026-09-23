@@ -1,45 +1,47 @@
-# 共通Dev Container Feature
+# Shared Dev Container Feature
 
-`agent-dev`は、Claude CodeやCodexを使う開発環境へ既存ツールと認証設定を共通構成で導入するDev Container Featureです。プロジェクト固有のランタイムや依存関係は各プロジェクトで管理します。
+[日本語](dev-container-feature.ja.md)
 
-## 提供範囲
+`agent-dev` is a Dev Container Feature that installs existing tools and authentication configuration in a shared setup for development environments using Claude Code and Codex. Project-specific runtimes and dependencies remain in each consumer project.
 
-### ツール
+## Scope
 
-| 導入対象 | 現在の指定 | バージョン方針 | 備考 |
+### Tools
+
+| Installed component | Current setting | Version policy | Notes |
 |---|---|---|---|
-| Node.js | `22` | 22系の最新版 | `node:1` Featureから導入[^3] |
-| GitHub CLI | `latest` | ビルド時点の最新版 | `github-cli:1` Featureから導入[^4] |
-| Claude Code CLI | `2.1.229` | 完全固定 | `claudeCodeVersion`で上書き可能 |
-| Codex CLI | `0.147.0` | 完全固定 | `codexVersion`で上書き可能 |
-| Claude Code VS Code拡張 | `anthropic.claude-code` | 未固定 | Marketplace版を利用[^5] |
-| ChatGPT VS Code拡張 | `openai.chatgpt` | 未固定 | Marketplace版を利用[^5] |
-| [vnzzzz/agent-skills](https://github.com/vnzzzz/agent-skills) | 既定ブランチ | 未固定 | post-create時点の内容をClaude Code / Codexへ導入 |
-| 基本ツール | OSパッケージリポジトリ | 未固定 | `git`、`curl`、`jq`、`make`、`openssl`、`shellcheck`、`unzip`、`zip`等 |
+| Node.js | `22` | Latest in the 22 series | Installed from the `node:1` Feature[^3] |
+| GitHub CLI | `latest` | Latest at build time | Installed from the `github-cli:1` Feature[^4] |
+| Claude Code CLI | `2.1.229` | Fully pinned | Can be overridden with `claudeCodeVersion` |
+| Codex CLI | `0.147.0` | Fully pinned | Can be overridden with `codexVersion` |
+| Claude Code VS Code extension | `anthropic.claude-code` | Unpinned | Uses the Marketplace version[^5] |
+| ChatGPT VS Code extension | `openai.chatgpt` | Unpinned | Uses the Marketplace version[^5] |
+| [vnzzzz/agent-skills](https://github.com/vnzzzz/agent-skills) | Default branch | Unpinned | Installed for Claude Code / Codex at post-create time |
+| Base tools | OS package repository | Unpinned | `git`, `curl`, `jq`, `make`, `openssl`, `shellcheck`, `unzip`, `zip`, and others |
 
-Claude Code / Codex CLIの既定値は`src/agent-dev/devcontainer-feature.json`を正本とし、インストール時に指定バージョンとの一致を確認します。
+`src/agent-dev/devcontainer-feature.json` is canonical for the default Claude Code / Codex CLI versions. Installation verifies that the installed versions match the configured values.
 
-### 認証関連
+### Authentication
 
-| 機能 | 内容 |
+| Feature | Description |
 |---|---|
-| `agent-github-auth` | GitHub Appを使ってGitHub操作とcommitのAuthor / Committerをエージェント単位で分離 |
-| 認証用ボリューム | Claude Code、Codex、GitHub CLIの認証領域を分離 |
-| GitHub App設定領域 | エージェントごとのGitHub App設定を分離 |
+| `agent-github-auth` | Uses GitHub Apps to separate GitHub operations and commit Author / Committer identities by Agent |
+| Authentication volumes | Separates authentication state for Claude Code, Codex, and GitHub CLI |
+| GitHub App configuration | Separates GitHub App configuration by Agent |
 
-認証情報の保存方式や寿命を含むセキュリティ境界は[SECURITY.md](../SECURITY.md)を正本とします。GitHub Appの設定方法は[GitHub Appによるエージェント認証](github-agent-identity.md)を参照してください。
+[SECURITY.md](../SECURITY.md) is canonical for security boundaries, including credential storage and lifetime. See [GitHub App authentication for agents](github-agent-identity.md) for GitHub App configuration.
 
-### バージョン固定の範囲
+### What the lockfile pins
 
-`.devcontainer-lock.json`は`agent-dev`と依存Featureのバージョン、digestを固定します。Featureのインストール時に外部から解決するツール、post-createで取得する`vnzzzz/agent-skills`、VS Code Marketplaceの拡張機能は固定しません。[^6]
+`.devcontainer-lock.json` pins versions and digests for `agent-dev` and dependent Features. It does not pin tools resolved externally during Feature installation, `vnzzzz/agent-skills` fetched during post-create, or extensions from the VS Code Marketplace.[^6]
 
-`agent-dev:1`は`2.x`へ自動移行しません。
+`agent-dev:1` does not automatically move to `2.x`.
 
-対象はDebian / Ubuntu系のDev Containerです。Dev Container Featureの仕様は公式資料を参照してください。[^1][^2]
+The supported target is Debian / Ubuntu-based Dev Containers. See the official documentation for the Dev Container Feature specification.[^1][^2]
 
-## 導入
+## Installation
 
-`.devcontainer/devcontainer.json`の`features`に追加します。
+Add the Feature to `features` in `.devcontainer/devcontainer.json`.
 
 ```json
 {
@@ -52,45 +54,45 @@ Claude Code / Codex CLIの既定値は`src/agent-dev/devcontainer-feature.json`�
 }
 ```
 
-## 更新
+## Updating
 
-Dev Containers CLIで確認・更新します。
+Use the Dev Containers CLI to inspect and apply updates.
 
 ```bash
 devcontainer outdated
 devcontainer upgrade
 ```
 
-更新後は`.devcontainer-lock.json`の差分を確認し、Dev Containerを再ビルドします。
+After updating, review the `.devcontainer-lock.json` diff and rebuild the Dev Container.
 
-## agent-devのバージョン
+## agent-dev versioning
 
-`agent-dev`はSemVerで管理します。
+`agent-dev` follows SemVer.
 
-- patch: 後方互換な修正、CLIのpatch更新
-- minor: 後方互換な機能追加
-- major: 利用側の変更が必要な破壊的変更
+- patch: backward-compatible fixes and CLI patch updates
+- minor: backward-compatible feature additions
+- major: breaking changes that require consumer changes
 
-公開済みの特定バージョンは上書きしません。
+Published exact versions are never overwritten.
 
 <a id="release-workflow"></a>
 
-## 開発とリリース
+## Development and release
 
-実装は`src/agent-dev/`、実コンテナを使うテストは`test/agent-dev/`にあります。
+Implementation lives under `src/agent-dev/`; real-container tests live under `test/agent-dev/`.
 
 ```bash
 make validate
 make test
 ```
 
-リリース対象の変更ではFeatureのバージョンを更新し、`feature-ci`と`security`が成功してからマージします。公開は`main`から`.github/workflows/release-feature.yml`を手動実行します。
+For release-bearing changes, update the Feature version and merge only after `feature-ci` and `security` succeed. Publishing is performed by manually running `.github/workflows/release-feature.yml` from `main`.
 
-リリースworkflowは、同一バージョンが未公開と確認できない場合は停止します。公開にはworkflow固有の`GITHUB_TOKEN`を使用します。
+The release workflow stops if it cannot confirm that the exact version is unpublished. Publishing uses the workflow-specific `GITHUB_TOKEN`.
 
-このリポジトリ自身のDev Containerは公開済み`agent-dev:1`を利用し、未公開バージョンを`.devcontainer-lock.json`へ先行反映しません。
+This repository's own Dev Container uses the published `agent-dev:1` and does not point `.devcontainer-lock.json` at an unpublished version.
 
-## 参考資料
+## References
 
 [^1]: [Dev Container Specification, Features](https://github.com/devcontainers/spec/blob/main/docs/specs/devcontainer-features.md)
 [^2]: [Dev Containers, Authoring a Dev Container Feature](https://containers.dev/guide/author-a-feature)

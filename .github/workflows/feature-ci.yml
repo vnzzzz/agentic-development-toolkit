@@ -33,21 +33,37 @@ jobs:
           set -Eeuo pipefail
           changed="$(git diff --name-only "$BASE_SHA"...HEAD)"
           failed=0
+          declare -A affected=()
 
-          while IFS= read -r source; do
-            case "$source" in
-              *.ja.md)
-                continue
-                ;;
+          while IFS= read -r path; do
+            case "$path" in
               README.md|SECURITY.md|docs/*.md)
-                mirror="${source%.md}.ja.md"
-                if ! grep -Fxq "$mirror" <<<"$changed"; then
-                  echo "::error::$source changed without updating $mirror"
-                  failed=1
+                if [[ "$path" == *.ja.md ]]; then
+                  affected["${path%.ja.md}.md"]=1
+                else
+                  affected["$path"]=1
                 fi
                 ;;
             esac
           done <<<"$changed"
+
+          for source in "${!affected[@]}"; do
+            mirror="${source%.md}.ja.md"
+
+            if grep -Fxq "$source" <<<"$changed" && ! grep -Fxq "$mirror" <<<"$changed"; then
+              echo "::error::$source changed without updating $mirror"
+              failed=1
+            fi
+
+            source_exists=0
+            mirror_exists=0
+            [[ -e "$source" ]] && source_exists=1
+            [[ -e "$mirror" ]] && mirror_exists=1
+            if (( source_exists != mirror_exists )); then
+              echo "::error::$source and $mirror must either both exist or both be absent"
+              failed=1
+            fi
+          done
 
           exit "$failed"
       - name: Install validation tools

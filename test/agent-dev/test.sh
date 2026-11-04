@@ -3,6 +3,8 @@ set -Eeuo pipefail
 
 claude --version >/dev/null
 codex --version >/dev/null
+claude plugin --help >/dev/null
+codex plugin --help >/dev/null
 gh --version >/dev/null
 git --version
 jq --version

@@ -49,11 +49,11 @@ claude_installed_version=${claude_version_output%% *}
 codex_version_rest=${codex_version_output#* }
 codex_installed_version=${codex_version_rest%% *}
 
-if [[ "$claude_installed_version" != "$CLAUDE_CODE_VERSION" ]]; then
+if [[ "$CLAUDE_CODE_VERSION" != latest && "$claude_installed_version" != "$CLAUDE_CODE_VERSION" ]]; then
   echo "ERROR: expected Claude Code ${CLAUDE_CODE_VERSION}, got: ${claude_version_output}" >&2
   exit 1
 fi
-if [[ "$codex_installed_version" != "$CODEX_VERSION" ]]; then
+if [[ "$CODEX_VERSION" != latest && "$codex_installed_version" != "$CODEX_VERSION" ]]; then
   echo "ERROR: expected Codex ${CODEX_VERSION}, got: ${codex_version_output}" >&2
   exit 1
 fi

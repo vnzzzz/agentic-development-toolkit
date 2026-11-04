@@ -26,7 +26,7 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bash scripts/check-release-version.sh
       - name: Publish Dev Container Features
-        uses: devcontainers/action@1082abd5d2bf3a11abccba70eef98df068277772 # v1
+        uses: devcontainers/action@bef2cf2d1a019b00b45e184f83035e01bd1972f3 # v1
         with:
           publish-features: "true"
           base-path-to-features: "./src"

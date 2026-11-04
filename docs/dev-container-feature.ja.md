@@ -12,14 +12,16 @@
 |---|---|---|---|
 | Node.js | `22` | 22系の最新版 | `node:1` Featureから導入[^3] |
 | GitHub CLI | `latest` | ビルド時点の最新版 | `github-cli:1` Featureから導入[^4] |
-| Claude Code CLI | `2.1.229` | 完全固定 | `claudeCodeVersion`で上書き可能 |
-| Codex CLI | `0.147.0` | 完全固定 | `codexVersion`で上書き可能 |
+| Claude Code CLI | `latest` | ビルド時点のnpm最新版 | `claudeCodeVersion`で固定可能 |
+| Codex CLI | `latest` | ビルド時点のnpm最新版 | `codexVersion`で固定可能 |
 | Claude Code VS Code拡張 | `anthropic.claude-code` | 未固定 | Marketplace版を利用[^5] |
 | ChatGPT VS Code拡張 | `openai.chatgpt` | 未固定 | Marketplace版を利用[^5] |
 | [vnzzzz/agent-skills](https://github.com/vnzzzz/agent-skills) | 既定ブランチ | 未固定 | post-create時点の内容をClaude Code / Codexへ導入 |
 | 基本ツール | OSパッケージリポジトリ | 未固定 | `git`、`curl`、`jq`、`make`、`openssl`、`shellcheck`、`unzip`、`zip`等 |
 
-Claude Code / Codex CLIの既定値は`src/agent-dev/devcontainer-feature.json`を正本とし、インストール時に指定バージョンとの一致を確認します。
+Claude Code / Codex CLIのバージョン指定は`src/agent-dev/devcontainer-feature.json`を正本とします。既定値はどちらもnpmの`latest`タグで、具体的なバージョンも指定できます。固定指定した場合、インストール時にバージョン一致を確認します。
+
+`latest`は**Dev Containerをビルドするたびに**解決され、起動するたびには更新されません。Featureのdigestを固定していても、再ビルド時にCLIが新しくなる場合があります。既存コンテナは自動更新されず、Claude Codeの自動更新も無効のままです。
 
 ### 認証関連
 
@@ -69,7 +71,7 @@ devcontainer upgrade
 
 `agent-dev`はSemVerで管理します。
 
-- patch: 後方互換な修正、CLIのpatch更新
+- patch: 後方互換な修正
 - minor: 後方互換な機能追加
 - major: 利用側の変更が必要な破壊的変更
 

@@ -12,14 +12,16 @@
 |---|---|---|---|
 | Node.js | `22` | Latest in the 22 series | Installed from the `node:1` Feature[^3] |
 | GitHub CLI | `latest` | Latest at build time | Installed from the `github-cli:1` Feature[^4] |
-| Claude Code CLI | `2.1.229` | Fully pinned | Can be overridden with `claudeCodeVersion` |
-| Codex CLI | `0.147.0` | Fully pinned | Can be overridden with `codexVersion` |
+| Claude Code CLI | `latest` | Latest npm release at build time | Can be pinned with `claudeCodeVersion` |
+| Codex CLI | `latest` | Latest npm release at build time | Can be pinned with `codexVersion` |
 | Claude Code VS Code extension | `anthropic.claude-code` | Unpinned | Uses the Marketplace version[^5] |
 | ChatGPT VS Code extension | `openai.chatgpt` | Unpinned | Uses the Marketplace version[^5] |
 | [vnzzzz/agent-skills](https://github.com/vnzzzz/agent-skills) | Default branch | Unpinned | Installed for Claude Code / Codex at post-create time |
 | Base tools | OS package repository | Unpinned | `git`, `curl`, `jq`, `make`, `openssl`, `shellcheck`, `unzip`, `zip`, and others |
 
-`src/agent-dev/devcontainer-feature.json` is canonical for the default Claude Code / Codex CLI versions. Installation verifies that the installed versions match the configured values.
+`src/agent-dev/devcontainer-feature.json` is canonical for the Claude Code / Codex CLI version options. Both default to the npm `latest` dist-tag; an exact version can still be specified. Installation verifies version equality when an exact version is requested.
+
+`latest` is resolved **on each Dev Container build**, not on every start. Rebuilding the same locked Feature can therefore install newer CLI versions. Existing containers are not automatically updated, and Claude Code auto-updates remain disabled.
 
 ### Authentication
 
@@ -69,7 +71,7 @@ After updating, review the `.devcontainer-lock.json` diff and rebuild the Dev Co
 
 `agent-dev` follows SemVer.
 
-- patch: backward-compatible fixes and CLI patch updates
+- patch: backward-compatible fixes
 - minor: backward-compatible feature additions
 - major: breaking changes that require consumer changes
 

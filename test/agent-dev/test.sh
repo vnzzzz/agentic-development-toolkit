@@ -52,6 +52,24 @@ done
   done
 )
 
+# Verify real CLI replacement without sudo, and that nvm remains functional.
+# The fixture above exercises npm's rename path offline; this checks the
+# production packages and default nvm activation end to end.
+[[ -n ${NVM_DIR:-} ]]
+[[ -r "$NVM_DIR/nvm.sh" ]]
+[[ -z ${NPM_CONFIG_PREFIX:-} ]]
+# shellcheck source=/dev/null
+source "$NVM_DIR/nvm.sh"
+nvm use default >/dev/null
+[[ $(npm root --global) == "$npm_root" ]]
+npm install --global --no-audit --no-fund @openai/codex @anthropic-ai/claude-code
+nvm use default >/dev/null
+[[ $(npm root --global) == "$npm_root" ]]
+node --version >/dev/null
+npm --version >/dev/null
+codex --version >/dev/null
+claude --version >/dev/null
+
 [[ "${CLAUDE_CONFIG_DIR:-}" == "/var/lib/agentic-dev/claude" ]]
 [[ "${CODEX_HOME:-}" == "/var/lib/agentic-dev/codex" ]]
 [[ "${GH_CONFIG_DIR:-}" == "/var/lib/agentic-dev/gh" ]]

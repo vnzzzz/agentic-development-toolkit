@@ -32,6 +32,8 @@ npm install --global @anthropic-ai/claude-code@latest
 
 この権限修正が反映されるのは、agent-dev 1.2.1以降を使用して**再ビルドしたコンテナ**です。1.2.0で作成済みのコンテナ内のroot所有パッケージは、公開済みの修正版へ更新して再ビルドするまで残ります。
 
+Node Featureが管理するnvmのnpm prefixは変更しません。`NPM_CONFIG_PREFIX`やユーザーの`.npmrc`に`prefix`を設定すると`nvm use`が動作しなくなる場合があるため、設定しないでください。CLIのバージョンを固定指定している場合、手動更新後も再ビルド時には指定バージョンが再インストールされます。
+
 ### 認証関連
 
 | 機能 | 内容 |

@@ -32,6 +32,8 @@ npm install --global @anthropic-ai/claude-code@latest
 
 This fixes npm ownership for **newly rebuilt containers** using agent-dev 1.2.1 or later. Existing containers built with 1.2.0 retain their root-owned packages until rebuilt with the released update.
 
+The Node Feature's nvm-managed npm prefix remains unchanged; do not set `NPM_CONFIG_PREFIX` or a user `.npmrc` `prefix`, which can break `nvm use`. When exact CLI versions are configured, rebuilding restores those pinned versions even if a newer version was manually installed.
+
 ### Authentication
 
 | Feature | Description |

@@ -42,9 +42,10 @@ done
   trap 'npm uninstall --global --offline --ignore-scripts --no-audit --no-fund @agent-dev/upgrade-probe >/dev/null 2>&1 || true; rm -rf "$probe_dir"' EXIT
   for version in 1.0.0 1.0.1; do
     mkdir -p "$probe_dir/$version"
-    printf '{"name":"@agent-dev/upgrade-probe","version":"%s","bin":{"agent-dev-upgrade-probe":"cli.js"}}\\n' "$version" >"$probe_dir/$version/package.json"
-    printf '#!/usr/bin/env node\\nconsole.log("upgrade-probe")\\n' >"$probe_dir/$version/cli.js"
-    npm install --global --offline --ignore-scripts --no-audit --no-fund "$probe_dir/$version" >/dev/null
+    printf '{"name":"@agent-dev/upgrade-probe","version":"%s","bin":{"agent-dev-upgrade-probe":"cli.js"}}\n' "$version" >"$probe_dir/$version/package.json"
+    printf '#!/usr/bin/env node\nconsole.log("upgrade-probe")\n' >"$probe_dir/$version/cli.js"
+    npm pack --offline --ignore-scripts --pack-destination "$probe_dir" "$probe_dir/$version" >/dev/null
+    npm install --global --offline --ignore-scripts --no-audit --no-fund "$probe_dir/agent-dev-upgrade-probe-$version.tgz" >/dev/null
     [[ $(jq -r .version "$npm_root/@agent-dev/upgrade-probe/package.json") == "$version" ]]
     [[ -x "$npm_prefix/bin/agent-dev-upgrade-probe" ]]
   done

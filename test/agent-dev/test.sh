@@ -15,6 +15,41 @@ zip -v >/dev/null
 curl --version >/dev/null
 openssl version >/dev/null
 
+# A root-only smoke test would miss the npm EACCES regression.
+if [[ $(id -u) -eq 0 ]]; then
+  echo "ERROR: Feature integration tests must run as a non-root remote user." >&2
+  exit 1
+fi
+
+npm_prefix=$(npm prefix --global)
+npm_root=$(npm root --global)
+[[ -w "$npm_prefix/bin" ]]
+[[ -w "$npm_root" ]]
+for package in @anthropic-ai/claude-code @openai/codex; do
+  [[ -d "$npm_root/$package" ]]
+  [[ -w "$npm_root/$package" ]]
+  [[ $(stat -c %u "$npm_root/$package") == "$(id -u)" ]]
+done
+[[ -w "$npm_root/@openai" ]]
+[[ -w "$npm_root/@anthropic-ai" ]]
+[[ $(realpath "$(command -v codex)") == "$npm_root/@openai/codex/"* ]]
+[[ $(realpath "$(command -v claude)") == "$npm_root/@anthropic-ai/claude-code/"* ]]
+
+# Exercise npm's package replacement (rename) and global bin-link update
+# without registry traffic or sudo; this reproduces Codex's update path.
+(
+  probe_dir=$(mktemp -d)
+  trap 'npm uninstall --global --offline --ignore-scripts --no-audit --no-fund @agent-dev/upgrade-probe >/dev/null 2>&1 || true; rm -rf "$probe_dir"' EXIT
+  for version in 1.0.0 1.0.1; do
+    mkdir -p "$probe_dir/$version"
+    printf '{"name":"@agent-dev/upgrade-probe","version":"%s","bin":{"agent-dev-upgrade-probe":"cli.js"}}\\n' "$version" >"$probe_dir/$version/package.json"
+    printf '#!/usr/bin/env node\\nconsole.log("upgrade-probe")\\n' >"$probe_dir/$version/cli.js"
+    npm install --global --offline --ignore-scripts --no-audit --no-fund "$probe_dir/$version" >/dev/null
+    [[ $(jq -r .version "$npm_root/@agent-dev/upgrade-probe/package.json") == "$version" ]]
+    [[ -x "$npm_prefix/bin/agent-dev-upgrade-probe" ]]
+  done
+)
+
 [[ "${CLAUDE_CONFIG_DIR:-}" == "/var/lib/agentic-dev/claude" ]]
 [[ "${CODEX_HOME:-}" == "/var/lib/agentic-dev/codex" ]]
 [[ "${GH_CONFIG_DIR:-}" == "/var/lib/agentic-dev/gh" ]]

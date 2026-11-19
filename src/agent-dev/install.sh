@@ -38,13 +38,47 @@ apt-get install -y --no-install-recommends \
   zip
 rm -rf /var/lib/apt/lists/*
 
-npm config set update-notifier false
-npm install --global \
+# The Node Feature installs nvm's global npm prefix for the remote user.
+# Installing the CLIs as root leaves root-owned packages that the user cannot
+# replace when Codex/Claude runs npm install --global to update itself.
+remote_user=${_REMOTE_USER:-${_CONTAINER_USER:-root}}
+if ! id "$remote_user" >/dev/null 2>&1; then
+  echo "ERROR: Dev Container remote user '$remote_user' does not exist." >&2
+  exit 1
+fi
+remote_group=$(id -gn "$remote_user")
+remote_home=$(getent passwd "$remote_user" | cut -d: -f6)
+if [[ -z "$remote_home" ]]; then
+  echo "ERROR: cannot resolve home directory for Dev Container remote user '$remote_user'." >&2
+  exit 1
+fi
+
+if ! command -v runuser >/dev/null 2>&1; then
+  echo "ERROR: runuser is required to install agent CLIs as the Dev Container remote user." >&2
+  exit 1
+fi
+
+run_as_remote_user() {
+  runuser -u "$remote_user" -- env HOME="$remote_home" PATH="$PATH" "$@"
+}
+
+npm_global_prefix=$(run_as_remote_user npm prefix --global)
+npm_global_root=$(run_as_remote_user npm root --global)
+if [[ -z "$npm_global_prefix" || -z "$npm_global_root" ]] ||
+   ! run_as_remote_user test -w "$npm_global_prefix/bin" ||
+   ! run_as_remote_user test -w "$npm_global_root"; then
+  echo "ERROR: npm global prefix must be writable by '$remote_user': $npm_global_prefix" >&2
+  echo "Check that the Node Feature and agent-dev use the same remote user." >&2
+  exit 1
+fi
+
+run_as_remote_user npm config set update-notifier false
+run_as_remote_user npm install --global \
   "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
   "@openai/codex@${CODEX_VERSION}"
 
-claude_version_output=$(claude --version)
-codex_version_output=$(codex --version)
+claude_version_output=$(run_as_remote_user claude --version)
+codex_version_output=$(run_as_remote_user codex --version)
 claude_installed_version=${claude_version_output%% *}
 codex_version_rest=${codex_version_output#* }
 codex_installed_version=${codex_version_rest%% *}
@@ -55,18 +89,6 @@ if [[ "$CLAUDE_CODE_VERSION" != latest && "$claude_installed_version" != "$CLAUD
 fi
 if [[ "$CODEX_VERSION" != latest && "$codex_installed_version" != "$CODEX_VERSION" ]]; then
   echo "ERROR: expected Codex ${CODEX_VERSION}, got: ${codex_version_output}" >&2
-  exit 1
-fi
-
-remote_user=${_REMOTE_USER:-${_CONTAINER_USER:-root}}
-if ! id "$remote_user" >/dev/null 2>&1; then
-  echo "ERROR: Dev Container remote user '$remote_user' does not exist." >&2
-  exit 1
-fi
-remote_group=$(id -gn "$remote_user")
-remote_home=$(getent passwd "$remote_user" | cut -d: -f6)
-if [[ -z "$remote_home" ]]; then
-  echo "ERROR: cannot resolve home directory for Dev Container remote user '$remote_user'." >&2
   exit 1
 fi
 

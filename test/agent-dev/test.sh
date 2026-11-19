@@ -11,6 +11,7 @@ npm_global_prefix=/usr/local/share/agentic-dev/npm-global
 [[ "${NPM_CONFIG_PREFIX:-}" == "$npm_global_prefix" ]]
 [[ $(npm config get prefix) == "$npm_global_prefix" ]]
 [[ $(npm root --global) == "$npm_global_prefix/lib/node_modules" ]]
+[[ -w "$npm_global_prefix" ]]
 [[ $(command -v codex) == "$npm_global_prefix/bin/codex" ]]
 [[ $(command -v claude) == "$npm_global_prefix/bin/claude" ]]
 

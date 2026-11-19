@@ -73,4 +73,4 @@ jobs:
       - name: Install Dev Container CLI
         run: npm install --global @devcontainers/cli@0.88.0
       - name: Test agent-dev Feature
-        run: devcontainer features test -f agent-dev -i mcr.microsoft.com/devcontainers/base:bookworm .
+        run: devcontainer features test -f agent-dev --remote-user vscode -i mcr.microsoft.com/devcontainers/base:bookworm .

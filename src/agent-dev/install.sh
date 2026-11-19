@@ -59,7 +59,10 @@ if ! command -v runuser >/dev/null 2>&1; then
 fi
 
 run_as_remote_user() {
-  runuser -u "$remote_user" -- env HOME="$remote_home" PATH="$PATH" "$@"
+  # Preserve NVM's shared nvm-group write access when Dev Containers remaps
+  # the remote user's UID/GID at container creation on Linux.
+  runuser -u "$remote_user" -- env HOME="$remote_home" PATH="$PATH" \
+    bash -c 'umask 0002; exec "$@"' bash "$@"
 }
 
 npm_global_prefix=$(run_as_remote_user npm prefix --global)

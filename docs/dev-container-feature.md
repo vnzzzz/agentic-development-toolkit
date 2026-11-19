@@ -23,6 +23,15 @@
 
 `latest` is resolved **on each Dev Container build**, not on every start. Rebuilding the same locked Feature can therefore install newer CLI versions. Existing containers are not automatically updated, and Claude Code auto-updates remain disabled.
 
+Both npm CLIs are installed as the Dev Container remote user into the Node Feature's npm global prefix. As that user, you can update them in a running container without `sudo`:
+
+```bash
+npm install --global @openai/codex@latest
+npm install --global @anthropic-ai/claude-code@latest
+```
+
+This fixes npm ownership for **newly rebuilt containers** using agent-dev 1.2.1 or later. Existing containers built with 1.2.0 retain their root-owned packages until rebuilt with the released update.
+
 ### Authentication
 
 | Feature | Description |

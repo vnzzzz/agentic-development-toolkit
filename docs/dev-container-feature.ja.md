@@ -23,6 +23,15 @@ Claude Code / Codex CLIのバージョン指定は`src/agent-dev/devcontainer-fe
 
 `latest`は**Dev Containerをビルドするたびに**解決され、起動するたびには更新されません。Featureのdigestを固定していても、再ビルド時にCLIが新しくなる場合があります。既存コンテナは自動更新されず、Claude Codeの自動更新も無効のままです。
 
+両CLIはDev Containerのremote user権限で、Node Featureのnpm global prefixに導入します。起動済みコンテナでも、そのユーザーから`sudo`なしで更新できます。
+
+```bash
+npm install --global @openai/codex@latest
+npm install --global @anthropic-ai/claude-code@latest
+```
+
+この権限修正が反映されるのは、agent-dev 1.2.1以降を使用して**再ビルドしたコンテナ**です。1.2.0で作成済みのコンテナ内のroot所有パッケージは、公開済みの修正版へ更新して再ビルドするまで残ります。
+
 ### 認証関連
 
 | 機能 | 内容 |

@@ -1,6 +1,6 @@
 {
   "id": "agent-dev",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "name": "Agent Development Environment",
   "description": "Installs and configures the shared Claude Code, Codex, GitHub CLI, and agent-skills development environment.",
   "documentationURL": "https://github.com/vnzzzz/agentic-development-toolkit/blob/main/docs/dev-container-feature.md",
@@ -45,7 +45,9 @@
     "CODEX_HOME": "/var/lib/agentic-dev/codex",
     "GH_CONFIG_DIR": "/var/lib/agentic-dev/gh",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-    "DISABLE_AUTOUPDATER": "1"
+    "DISABLE_AUTOUPDATER": "1",
+    "NPM_CONFIG_PREFIX": "/usr/local/share/agentic-dev/npm-global",
+    "PATH": "/usr/local/share/agentic-dev/npm-global/bin:${PATH}"
   },
   "postCreateCommand": "/usr/local/share/agentic-dev/post-create.sh",
   "customizations": {

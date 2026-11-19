@@ -38,10 +38,32 @@ apt-get install -y --no-install-recommends \
   zip
 rm -rf /var/lib/apt/lists/*
 
+remote_user=${_REMOTE_USER:-${_CONTAINER_USER:-root}}
+if ! id "$remote_user" >/dev/null 2>&1; then
+  echo "ERROR: Dev Container remote user '$remote_user' does not exist." >&2
+  exit 1
+fi
+remote_group=$(id -gn "$remote_user")
+remote_home=$(getent passwd "$remote_user" | cut -d: -f6)
+if [[ -z "$remote_home" ]]; then
+  echo "ERROR: cannot resolve home directory for Dev Container remote user '$remote_user'." >&2
+  exit 1
+fi
+
+# Use a Node-version-independent global prefix owned by the remote user.
+# Keep npm's runtime prefix and the executable lookup path consistent.
+npm_global_prefix=/usr/local/share/agentic-dev/npm-global
+install -d -m 0755 /usr/local/share/agentic-dev "$npm_global_prefix"
+export NPM_CONFIG_PREFIX="$npm_global_prefix"
+export PATH="$npm_global_prefix/bin:$PATH"
+
 npm config set update-notifier false
 npm install --global \
   "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
   "@openai/codex@${CODEX_VERSION}"
+# npm runs as root during Feature installation; hand the whole installed
+# package tree (not just the prefix directory) to the remote user.
+chown -R "$remote_user:$remote_group" "$npm_global_prefix"
 
 claude_version_output=$(claude --version)
 codex_version_output=$(codex --version)
@@ -55,18 +77,6 @@ if [[ "$CLAUDE_CODE_VERSION" != latest && "$claude_installed_version" != "$CLAUD
 fi
 if [[ "$CODEX_VERSION" != latest && "$codex_installed_version" != "$CODEX_VERSION" ]]; then
   echo "ERROR: expected Codex ${CODEX_VERSION}, got: ${codex_version_output}" >&2
-  exit 1
-fi
-
-remote_user=${_REMOTE_USER:-${_CONTAINER_USER:-root}}
-if ! id "$remote_user" >/dev/null 2>&1; then
-  echo "ERROR: Dev Container remote user '$remote_user' does not exist." >&2
-  exit 1
-fi
-remote_group=$(id -gn "$remote_user")
-remote_home=$(getent passwd "$remote_user" | cut -d: -f6)
-if [[ -z "$remote_home" ]]; then
-  echo "ERROR: cannot resolve home directory for Dev Container remote user '$remote_user'." >&2
   exit 1
 fi
 

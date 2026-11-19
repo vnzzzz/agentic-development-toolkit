@@ -23,6 +23,17 @@
 
 `latest` is resolved **on each Dev Container build**, not on every start. Rebuilding the same locked Feature can therefore install newer CLI versions. Existing containers are not automatically updated, and Claude Code auto-updates remain disabled.
 
+Both CLIs are installed into `/usr/local/share/agentic-dev/npm-global`, not the Node Feature's root-owned nvm directory. The Feature assigns the installed package tree to the Dev Container remote user and configures `NPM_CONFIG_PREFIX` and `PATH` accordingly. After rebuilding with this Feature, the remote user can update either CLI without `sudo`:
+
+```bash
+npm install -g @openai/codex@latest @anthropic-ai/claude-code@latest
+npm config get prefix
+command -v codex
+command -v claude
+```
+
+The new prefix is applied only by rebuilding the container with the updated Feature; it does **not** change already-running containers built with earlier versions. With explicit CLI version options, a subsequent rebuild reinstalls the selected versions, even if they were manually updated in the meantime.
+
 ### Authentication
 
 | Feature | Description |

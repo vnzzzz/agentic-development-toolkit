@@ -23,6 +23,17 @@ Claude Code / Codex CLIのバージョン指定は`src/agent-dev/devcontainer-fe
 
 `latest`は**Dev Containerをビルドするたびに**解決され、起動するたびには更新されません。Featureのdigestを固定していても、再ビルド時にCLIが新しくなる場合があります。既存コンテナは自動更新されず、Claude Codeの自動更新も無効のままです。
 
+CLIはNode Featureのroot所有nvmディレクトリではなく、`/usr/local/share/agentic-dev/npm-global`に導入します。インストール済みパッケージツリーの所有権をDev Containerのremote userに移し、`NPM_CONFIG_PREFIX`と`PATH`を同じ場所に設定します。このFeatureへ更新して再ビルドすれば、remote userは`sudo`なしで両CLIを更新できます。
+
+```bash
+npm install -g @openai/codex@latest @anthropic-ai/claude-code@latest
+npm config get prefix
+command -v codex
+command -v claude
+```
+
+この変更は更新後のFeatureでコンテナを再ビルドした場合に適用され、**旧バージョンで作成済みの起動中コンテナには自動適用されません**。CLIのバージョンを明示指定している場合、手動更新後でも再ビルド時に指定バージョンへ戻ります。
+
 ### 認証関連
 
 | 機能 | 内容 |

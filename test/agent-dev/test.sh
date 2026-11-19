@@ -5,6 +5,37 @@ claude --version >/dev/null
 codex --version >/dev/null
 claude plugin --help >/dev/null
 codex plugin --help >/dev/null
+
+# A normal remote user must be able to update the exact installed CLI tree.
+npm_global_prefix=/usr/local/share/agentic-dev/npm-global
+[[ "${NPM_CONFIG_PREFIX:-}" == "$npm_global_prefix" ]]
+[[ $(npm config get prefix) == "$npm_global_prefix" ]]
+[[ $(npm root --global) == "$npm_global_prefix/lib/node_modules" ]]
+[[ $(command -v codex) == "$npm_global_prefix/bin/codex" ]]
+[[ $(command -v claude) == "$npm_global_prefix/bin/claude" ]]
+
+npm_update_runner=()
+if [[ $(id -u) -eq 0 ]]; then
+  npm_owner=$(stat -c %U "$npm_global_prefix")
+  [[ $npm_owner != root ]]
+  npm_update_runner=(
+    runuser -u "$npm_owner" -- env
+    "NPM_CONFIG_PREFIX=$npm_global_prefix"
+    "PATH=$npm_global_prefix/bin:$PATH"
+  )
+fi
+"${npm_update_runner[@]}" bash -c '
+  set -Eeuo pipefail
+  [[ $(id -u) -ne 0 ]]
+  [[ -w "$NPM_CONFIG_PREFIX" ]]
+  [[ $(npm config get prefix) == "$NPM_CONFIG_PREFIX" ]]
+  [[ $(command -v codex) == "$NPM_CONFIG_PREFIX/bin/codex" ]]
+  [[ $(command -v claude) == "$NPM_CONFIG_PREFIX/bin/claude" ]]
+  npm install --global --no-audit --no-fund @openai/codex @anthropic-ai/claude-code
+  codex --version
+  claude --version
+'
+
 gh --version >/dev/null
 git --version
 jq --version

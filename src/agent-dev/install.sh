@@ -38,6 +38,9 @@ apt-get install -y --no-install-recommends \
   zip
 rm -rf /var/lib/apt/lists/*
 
+# The Node Feature installs nvm's global npm prefix for the remote user.
+# Installing the CLIs as root leaves root-owned packages that the user cannot
+# replace when Codex/Claude runs npm install --global to update itself.
 remote_user=${_REMOTE_USER:-${_CONTAINER_USER:-root}}
 if ! id "$remote_user" >/dev/null 2>&1; then
   echo "ERROR: Dev Container remote user '$remote_user' does not exist." >&2
@@ -50,31 +53,35 @@ if [[ -z "$remote_home" ]]; then
   exit 1
 fi
 
-install -d -m 0700 \
-  /var/lib/agentic-dev/claude \
-  /var/lib/agentic-dev/codex \
-  /var/lib/agentic-dev/gh
-chown -R "$remote_user:$remote_group" /var/lib/agentic-dev
-
-# Node's nvm Feature owns the global npm prefix. Install as the remote
-# user rather than creating root-owned package directories under nvm.
-# A separate npm prefix (including NPM_CONFIG_PREFIX) is incompatible with nvm.
-npm config set update-notifier false
-npm_install_args=(
-  --global
-  "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
-  "@openai/codex@${CODEX_VERSION}"
-)
-if [[ $(id -u "$remote_user") -eq 0 ]]; then
-  npm install "${npm_install_args[@]}"
-else
-  runuser -u "$remote_user" -- env \
-    "HOME=$remote_home" "PATH=$PATH" \
-    npm install "${npm_install_args[@]}"
+if ! command -v runuser >/dev/null 2>&1; then
+  echo "ERROR: runuser is required to install agent CLIs as the Dev Container remote user." >&2
+  exit 1
 fi
 
-claude_version_output=$(claude --version)
-codex_version_output=$(codex --version)
+run_as_remote_user() {
+  # Preserve NVM's shared nvm-group write access when Dev Containers remaps
+  # the remote user's UID/GID at container creation on Linux.
+  runuser -u "$remote_user" -- env HOME="$remote_home" PATH="$PATH" \
+    bash -c 'umask 0002; exec "$@"' bash "$@"
+}
+
+npm_global_prefix=$(run_as_remote_user npm prefix --global)
+npm_global_root=$(run_as_remote_user npm root --global)
+if [[ -z "$npm_global_prefix" || -z "$npm_global_root" ]] ||
+   ! run_as_remote_user test -w "$npm_global_prefix/bin" ||
+   ! run_as_remote_user test -w "$npm_global_root"; then
+  echo "ERROR: npm global prefix must be writable by '$remote_user': $npm_global_prefix" >&2
+  echo "Check that the Node Feature and agent-dev use the same remote user." >&2
+  exit 1
+fi
+
+run_as_remote_user npm config set update-notifier false
+run_as_remote_user npm install --global \
+  "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+  "@openai/codex@${CODEX_VERSION}"
+
+claude_version_output=$(run_as_remote_user claude --version)
+codex_version_output=$(run_as_remote_user codex --version)
 claude_installed_version=${claude_version_output%% *}
 codex_version_rest=${codex_version_output#* }
 codex_installed_version=${codex_version_rest%% *}
@@ -87,6 +94,12 @@ if [[ "$CODEX_VERSION" != latest && "$codex_installed_version" != "$CODEX_VERSIO
   echo "ERROR: expected Codex ${CODEX_VERSION}, got: ${codex_version_output}" >&2
   exit 1
 fi
+
+install -d -m 0700 \
+  /var/lib/agentic-dev/claude \
+  /var/lib/agentic-dev/codex \
+  /var/lib/agentic-dev/gh
+chown -R "$remote_user:$remote_group" /var/lib/agentic-dev
 
 mkdir -p \
   "$remote_home/.config/agent-dev/github-apps/claude" \

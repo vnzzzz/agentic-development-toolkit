@@ -4,18 +4,18 @@ set -Eeuo pipefail
 MARKETPLACE_SOURCE=${AGENT_SKILLS_MARKETPLACE_SOURCE:-https://github.com/vnzzzz/agent-skills.git}
 MARKETPLACE_NAME=vnzzzz-agent-skills
 PLUGIN_ID=agent-skills@vnzzzz-agent-skills
-WRITABLE_DIRS=(
+AUTH_DIRS=(
   /var/lib/agentic-dev/claude
   /var/lib/agentic-dev/codex
   /var/lib/agentic-dev/gh
 )
 
-normalize_runtime_directory_ownership() {
+normalize_auth_volume_ownership() {
   local uid gid directory
   uid=$(id -u)
   gid=$(id -g)
 
-  for directory in "${WRITABLE_DIRS[@]}"; do
+  for directory in "${AUTH_DIRS[@]}"; do
     if [[ -w "$directory" ]]; then
       continue
     fi
@@ -25,23 +25,14 @@ normalize_runtime_directory_ownership() {
     elif command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
       sudo chown -R "$uid:$gid" "$directory"
     else
-      echo "ERROR: cannot make agent-dev runtime directory writable: $directory" >&2
-      echo "The Dev Container remote user must own the directory or have passwordless sudo." >&2
+      echo "ERROR: cannot make authentication volume writable: $directory" >&2
+      echo "The Dev Container remote user must own the volume or have passwordless sudo." >&2
       exit 1
     fi
   done
 }
 
-# UID remapping can leave CLI package directories owned by the build-time UID.
-# Repair only the agent package scopes, not nvm or Node itself.
-npm_global_root=$(npm root --global)
-for package_scope in @openai @anthropic-ai; do
-  if [[ -d "$npm_global_root/$package_scope" ]]; then
-    WRITABLE_DIRS+=("$npm_global_root/$package_scope")
-  fi
-done
-
-normalize_runtime_directory_ownership
+normalize_auth_volume_ownership
 
 command -v codex >/dev/null || {
   echo "ERROR: codex CLI is required before installing the agent-skills Plugin." >&2

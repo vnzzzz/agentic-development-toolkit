@@ -23,16 +23,16 @@
 
 `latest` is resolved **on each Dev Container build**, not on every start. Rebuilding the same locked Feature can therefore install newer CLI versions. Existing containers are not automatically updated, and Claude Code auto-updates remain disabled.
 
-Both CLIs are installed as the Dev Container remote user into the Node Feature's nvm-managed npm global prefix. No separate `NPM_CONFIG_PREFIX` or user `.npmrc` prefix is set: `nvm use` keeps working, and the remote user can update the installed packages without `sudo`:
+Both npm CLIs are installed as the Dev Container remote user into the Node Feature's npm global prefix. As that user, you can update them in a running container without `sudo`:
 
 ```bash
-npm install -g @openai/codex@latest @anthropic-ai/claude-code@latest
-npm config get prefix
-command -v codex
-command -v claude
+npm install --global @openai/codex@latest
+npm install --global @anthropic-ai/claude-code@latest
 ```
 
-The ownership fix only applies after updating the Feature and rebuilding. It does **not** change already-running containers built with earlier versions. With exact CLI version options, rebuilding reinstalls the selected versions even if they were manually updated in the meantime.
+This fixes npm ownership for **newly rebuilt containers** using agent-dev 1.2.1 or later. Existing containers built with 1.2.0 retain their root-owned packages until rebuilt with the released update.
+
+The Node Feature's nvm-managed npm prefix remains unchanged; do not set `NPM_CONFIG_PREFIX` or a user `.npmrc` `prefix`, which can break `nvm use`. When exact CLI versions are configured, rebuilding restores those pinned versions even if a newer version was manually installed.
 
 ### Authentication
 

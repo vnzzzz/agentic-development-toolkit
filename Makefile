@@ -21,4 +21,4 @@ validate:
 	bash test/release-version-check.sh
 
 test: validate
-	devcontainer features test -f agent-dev -i $(BASE_IMAGE) .
+	devcontainer features test -f agent-dev --remote-user vscode -i $(BASE_IMAGE) .

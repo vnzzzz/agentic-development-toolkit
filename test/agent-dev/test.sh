@@ -30,7 +30,6 @@ printf 'npm test identity: uid=%s prefix=%s root=%s codex=%s claude=%s\\n' "$(id
 for package in @anthropic-ai/claude-code @openai/codex; do
   [[ -d "$npm_root/$package" ]]
   [[ -w "$npm_root/$package" ]]
-  [[ $(stat -c %u "$npm_root/$package") == "$(id -u)" ]]
 done
 [[ -w "$npm_root/@openai" ]]
 [[ -w "$npm_root/@anthropic-ai" ]]

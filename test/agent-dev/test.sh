@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+trap 'printf "ERROR: Feature test failed at line %s: %s\\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
 
 claude --version >/dev/null
 codex --version >/dev/null
@@ -23,6 +24,7 @@ fi
 
 npm_prefix=$(npm prefix --global)
 npm_root=$(npm root --global)
+printf 'npm test identity: uid=%s prefix=%s root=%s codex=%s claude=%s\\n' "$(id -u)" "$npm_prefix" "$npm_root" "$(command -v codex)" "$(command -v claude)"
 [[ -w "$npm_prefix/bin" ]]
 [[ -w "$npm_root" ]]
 for package in @anthropic-ai/claude-code @openai/codex; do

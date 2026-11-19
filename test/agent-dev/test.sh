@@ -25,6 +25,7 @@ if [[ $(id -u) -eq 0 ]]; then
     "PATH=$npm_global_prefix/bin:$PATH"
   )
 fi
+# shellcheck disable=SC2016 # Variables expand inside the child bash, not this shell.
 "${npm_update_runner[@]}" bash -c '
   set -Eeuo pipefail
   [[ $(id -u) -ne 0 ]]

@@ -50,20 +50,28 @@ if [[ -z "$remote_home" ]]; then
   exit 1
 fi
 
-# Use a Node-version-independent global prefix owned by the remote user.
-# Keep npm's runtime prefix and the executable lookup path consistent.
-npm_global_prefix=/usr/local/share/agentic-dev/npm-global
-install -d -m 0755 /usr/local/share/agentic-dev "$npm_global_prefix"
-export NPM_CONFIG_PREFIX="$npm_global_prefix"
-export PATH="$npm_global_prefix/bin:$PATH"
+install -d -m 0700 \
+  /var/lib/agentic-dev/claude \
+  /var/lib/agentic-dev/codex \
+  /var/lib/agentic-dev/gh
+chown -R "$remote_user:$remote_group" /var/lib/agentic-dev
 
+# Node's nvm Feature owns the global npm prefix. Install as the remote
+# user rather than creating root-owned package directories under nvm.
+# A separate npm prefix (including NPM_CONFIG_PREFIX) is incompatible with nvm.
 npm config set update-notifier false
-npm install --global \
-  "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+npm_install_args=(
+  --global
+  "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
   "@openai/codex@${CODEX_VERSION}"
-# npm runs as root during Feature installation; hand the whole installed
-# package tree (not just the prefix directory) to the remote user.
-chown -R "$remote_user:$remote_group" "$npm_global_prefix"
+)
+if [[ $(id -u "$remote_user") -eq 0 ]]; then
+  npm install "${npm_install_args[@]}"
+else
+  runuser -u "$remote_user" -- env \
+    "HOME=$remote_home" "PATH=$PATH" \
+    npm install "${npm_install_args[@]}"
+fi
 
 claude_version_output=$(claude --version)
 codex_version_output=$(codex --version)
@@ -79,12 +87,6 @@ if [[ "$CODEX_VERSION" != latest && "$codex_installed_version" != "$CODEX_VERSIO
   echo "ERROR: expected Codex ${CODEX_VERSION}, got: ${codex_version_output}" >&2
   exit 1
 fi
-
-install -d -m 0700 \
-  /var/lib/agentic-dev/claude \
-  /var/lib/agentic-dev/codex \
-  /var/lib/agentic-dev/gh
-chown -R "$remote_user:$remote_group" /var/lib/agentic-dev
 
 mkdir -p \
   "$remote_home/.config/agent-dev/github-apps/claude" \

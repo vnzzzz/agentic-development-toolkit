@@ -8,7 +8,6 @@ WRITABLE_DIRS=(
   /var/lib/agentic-dev/claude
   /var/lib/agentic-dev/codex
   /var/lib/agentic-dev/gh
-  /usr/local/share/agentic-dev/npm-global
 )
 
 normalize_runtime_directory_ownership() {
@@ -32,6 +31,15 @@ normalize_runtime_directory_ownership() {
     fi
   done
 }
+
+# UID remapping can leave CLI package directories owned by the build-time UID.
+# Repair only the agent package scopes, not nvm or Node itself.
+npm_global_root=$(npm root --global)
+for package_scope in @openai @anthropic-ai; do
+  if [[ -d "$npm_global_root/$package_scope" ]]; then
+    WRITABLE_DIRS+=("$npm_global_root/$package_scope")
+  fi
+done
 
 normalize_runtime_directory_ownership
 

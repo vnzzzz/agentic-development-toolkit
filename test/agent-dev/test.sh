@@ -6,34 +6,36 @@ codex --version >/dev/null
 claude plugin --help >/dev/null
 codex plugin --help >/dev/null
 
-# A normal remote user must be able to update the exact installed CLI tree.
-npm_global_prefix=/usr/local/share/agentic-dev/npm-global
-[[ "${NPM_CONFIG_PREFIX:-}" == "$npm_global_prefix" ]]
-[[ $(npm config get prefix) == "$npm_global_prefix" ]]
-[[ $(npm root --global) == "$npm_global_prefix/lib/node_modules" ]]
-[[ -w "$npm_global_prefix" ]]
-[[ $(command -v codex) == "$npm_global_prefix/bin/codex" ]]
-[[ $(command -v claude) == "$npm_global_prefix/bin/claude" ]]
+# The Node Feature's nvm prefix must remain usable without sudo.
+[[ -z ${NPM_CONFIG_PREFIX:-} ]]
+npm_global_root=$(npm root --global)
+[[ $(npm config get prefix) == "$(dirname "$(dirname "$(readlink -f "$(command -v node)")")")" ]]
+[[ -w "$npm_global_root" ]]
+[[ -w "$npm_global_root/@openai" ]]
+[[ -w "$npm_global_root/@anthropic-ai" ]]
 
 npm_update_runner=()
 if [[ $(id -u) -eq 0 ]]; then
-  npm_owner=$(stat -c %U "$npm_global_prefix")
+  npm_owner=$(stat -c %U "$npm_global_root/@openai")
   [[ $npm_owner != root ]]
   npm_update_runner=(
     runuser -u "$npm_owner" -- env
-    "NPM_CONFIG_PREFIX=$npm_global_prefix"
-    "PATH=$npm_global_prefix/bin:$PATH"
+    "HOME=$(getent passwd "$npm_owner" | cut -d: -f6)"
+    "PATH=$PATH" "NVM_DIR=$NVM_DIR"
   )
 fi
-# shellcheck disable=SC2016 # Variables expand inside the child bash, not this shell.
+# shellcheck disable=SC2016 # Expansion is intentionally deferred to child bash.
 "${npm_update_runner[@]}" bash -c '
   set -Eeuo pipefail
   [[ $(id -u) -ne 0 ]]
-  [[ -w "$NPM_CONFIG_PREFIX" ]]
-  [[ $(npm config get prefix) == "$NPM_CONFIG_PREFIX" ]]
-  [[ $(command -v codex) == "$NPM_CONFIG_PREFIX/bin/codex" ]]
-  [[ $(command -v claude) == "$NPM_CONFIG_PREFIX/bin/claude" ]]
+  [[ -z ${NPM_CONFIG_PREFIX:-} ]]
+  [[ -w "$(npm root --global)/@openai" ]]
+  [[ -w "$(npm root --global)/@anthropic-ai" ]]
   npm install --global --no-audit --no-fund @openai/codex @anthropic-ai/claude-code
+  . "$NVM_DIR/nvm.sh"
+  nvm use default >/dev/null
+  node --version
+  npm --version
   codex --version
   claude --version
 '
